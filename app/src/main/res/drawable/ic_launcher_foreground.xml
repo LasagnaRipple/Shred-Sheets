@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:width="58dp"
+        android:height="31dp"
+        android:drawable="@drawable/ic_shred_sheets_logo"
+        android:gravity="center" />
+</layer-list>
+

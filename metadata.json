@@ -1,0 +1,7 @@
+{
+  "name": "Shred Sheets",
+  "description": "Interactive guitar and string instrument tuner with real-time visual pitch detection, animated Shaka feedback, chord library, anagram generator, and metronome.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
