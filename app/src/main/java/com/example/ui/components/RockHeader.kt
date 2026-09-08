@@ -48,6 +48,7 @@ import com.example.R
 import com.example.model.AppStyleTheme
 import com.example.model.InstrumentType
 import com.example.model.TuningMode
+import com.example.ui.theme.LocalIsDarkTheme
 import com.example.ui.theme.VibrantDarkBorder
 import com.example.ui.theme.VibrantDarkCard
 
@@ -67,6 +68,9 @@ fun RockHeader(
     modifier: Modifier = Modifier
 ) {
     val haptic = LocalHapticFeedback.current
+    val isDark = LocalIsDarkTheme.current
+    val buttonBg = if (isDark) VibrantDarkCard else MaterialTheme.colorScheme.surfaceVariant
+    val buttonBorder = if (isDark) VibrantDarkBorder else MaterialTheme.colorScheme.outlineVariant
 
     Column(
         modifier = modifier
@@ -105,8 +109,8 @@ fun RockHeader(
                     modifier = Modifier
                         .size(38.dp)
                         .clip(CircleShape)
-                        .background(VibrantDarkCard)
-                        .border(1.dp, VibrantDarkBorder, CircleShape)
+                        .background(buttonBg)
+                        .border(1.dp, buttonBorder, CircleShape)
                         .clickable {
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             onInstrumentClick()
@@ -122,10 +126,10 @@ fun RockHeader(
                     modifier = Modifier
                         .size(38.dp)
                         .clip(CircleShape)
-                        .background(VibrantDarkCard)
+                        .background(buttonBg)
                         .border(
                             1.dp,
-                            if (soundEnabled) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f) else VibrantDarkBorder,
+                            if (soundEnabled) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f) else buttonBorder,
                             CircleShape
                         )
                         .clickable {
@@ -148,8 +152,8 @@ fun RockHeader(
                     modifier = Modifier
                         .size(38.dp)
                         .clip(CircleShape)
-                        .background(VibrantDarkCard)
-                        .border(1.dp, VibrantDarkBorder, CircleShape)
+                        .background(buttonBg)
+                        .border(1.dp, buttonBorder, CircleShape)
                         .clickable {
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             onSettingsClick()
@@ -181,10 +185,10 @@ fun RockHeader(
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(20.dp))
-                    .background(VibrantDarkCard)
+                    .background(buttonBg)
                     .border(
                         1.dp,
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
+                        MaterialTheme.colorScheme.primary.copy(alpha = if (isDark) 0.4f else 0.7f),
                         RoundedCornerShape(20.dp)
                     )
                     .clickable {
@@ -223,7 +227,11 @@ fun RockHeader(
                         fontSize = 11.sp,
                         letterSpacing = 0.5.sp
                     ),
-                    color = if (isAutoMode) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                    color = if (isAutoMode) {
+                        if (isDark) Color.White else MaterialTheme.colorScheme.onSurface
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    }
                 )
                 Switch(
                     checked = isAutoMode,
@@ -235,9 +243,9 @@ fun RockHeader(
                     colors = SwitchDefaults.colors(
                         checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
                         checkedTrackColor = MaterialTheme.colorScheme.primary,
-                        uncheckedThumbColor = Color(0xFF9E9E9E),
-                        uncheckedTrackColor = Color(0xFF232A34),
-                        uncheckedBorderColor = Color(0xFF3B4856)
+                        uncheckedThumbColor = if (isDark) Color(0xFF9E9E9E) else Color(0xFF94A3B8),
+                        uncheckedTrackColor = if (isDark) Color(0xFF232A34) else Color(0xFFE2E8F0),
+                        uncheckedBorderColor = if (isDark) Color(0xFF3B4856) else Color(0xFFCBD5E1)
                     )
                 )
             }

@@ -55,6 +55,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -69,7 +70,7 @@ import androidx.compose.ui.window.Dialog
 import com.example.model.ChordItem
 import com.example.model.ChordRepository
 import com.example.model.InstrumentType
-import com.example.ui.theme.ShredBrandVolt
+import com.example.ui.theme.LocalIsDarkTheme
 import com.example.ui.theme.ShredCardBorder
 import com.example.ui.theme.ShredCardSurface
 import com.example.ui.theme.ShredFretGrid
@@ -106,6 +107,13 @@ fun ChordLibraryScreen(
     var isStrumming by remember { mutableStateOf(false) }
     var strumJob by remember { mutableStateOf<Job?>(null) }
     val speakerScale = remember { Animatable(1.0f) }
+    val activeAccent = MaterialTheme.colorScheme.primary
+    val onActiveAccent = MaterialTheme.colorScheme.onPrimary
+    val isDark = LocalIsDarkTheme.current
+    val cardSurface = if (isDark) ShredCardSurface else MaterialTheme.colorScheme.surface
+    val cardBorder = if (isDark) ShredCardBorder else MaterialTheme.colorScheme.outlineVariant
+    val primaryTextColor = if (isDark) ShredPrimaryText else MaterialTheme.colorScheme.onSurface
+    val mutedTextColor = if (isDark) ShredMutedText else MaterialTheme.colorScheme.onSurfaceVariant
 
     Column(
         modifier = modifier
@@ -114,7 +122,7 @@ fun ChordLibraryScreen(
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // 1. Header: "Chord library" in sentence case, brand yellow-green, info icon on right
+        // 1. Header: "Chord library" in sentence case, brand accent, info icon on right
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -129,7 +137,7 @@ fun ChordLibraryScreen(
                         lineHeight = 36.sp,
                         letterSpacing = (-0.5).sp
                     ),
-                    color = ShredBrandVolt
+                    color = activeAccent
                 )
             }
 
@@ -144,7 +152,7 @@ fun ChordLibraryScreen(
                 Icon(
                     imageVector = Icons.Outlined.Info,
                     contentDescription = "Diagram Key",
-                    tint = ShredBrandVolt
+                    tint = activeAccent
                 )
             }
         }
@@ -162,11 +170,11 @@ fun ChordLibraryScreen(
                     modifier = Modifier
                         .clip(RoundedCornerShape(999.dp))
                         .background(
-                            if (isSelected) ShredBrandVolt else ShredCardSurface
+                            if (isSelected) activeAccent else cardSurface
                         )
                         .border(
                             width = 1.5.dp,
-                            color = if (isSelected) ShredBrandVolt else ShredCardBorder,
+                            color = if (isSelected) activeAccent else cardBorder,
                             shape = RoundedCornerShape(999.dp)
                         )
                         .clickable {
@@ -183,7 +191,7 @@ fun ChordLibraryScreen(
                             fontWeight = FontWeight.Bold,
                             fontSize = 13.sp
                         ),
-                        color = if (isSelected) Color(0xFF121212) else ShredPrimaryText
+                        color = if (isSelected) onActiveAccent else primaryTextColor
                     )
                 }
             }
@@ -192,15 +200,14 @@ fun ChordLibraryScreen(
         Spacer(modifier = Modifier.height(14.dp))
 
         // 3. Chord diagram card — the main enhancement:
-        // Dark card surface (#12140F), subtle border (#2A2D22), rounded 16dp corners
         selectedChord?.let { chord ->
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(16.dp))
-                    .border(BorderStroke(1.5.dp, ShredCardBorder), RoundedCornerShape(16.dp)),
+                    .border(BorderStroke(1.5.dp, cardBorder), RoundedCornerShape(16.dp)),
                 colors = CardDefaults.cardColors(
-                    containerColor = ShredCardSurface
+                    containerColor = cardSurface
                 ),
                 shape = RoundedCornerShape(16.dp)
             ) {
@@ -228,7 +235,7 @@ fun ChordLibraryScreen(
                                         fontWeight = FontWeight.Black,
                                         fontSize = 24.sp
                                     ),
-                                    color = ShredPrimaryText,
+                                    color = primaryTextColor,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
@@ -246,7 +253,7 @@ fun ChordLibraryScreen(
                                     Icon(
                                         imageVector = Icons.Outlined.Info,
                                         contentDescription = "Diagram Key",
-                                        tint = ShredBrandVolt,
+                                        tint = activeAccent,
                                         modifier = Modifier.size(19.dp)
                                     )
                                 }
@@ -266,7 +273,7 @@ fun ChordLibraryScreen(
                                     fontWeight = FontWeight.Medium,
                                     fontSize = 13.sp
                                 ),
-                                color = ShredMutedText
+                                color = mutedTextColor
                             )
                         }
 
@@ -276,8 +283,8 @@ fun ChordLibraryScreen(
                                 .scale(speakerScale.value)
                                 .size(42.dp)
                                 .clip(CircleShape)
-                                .background(if (isStrumming) ShredBrandVolt else Color.Transparent)
-                                .border(1.5.dp, ShredBrandVolt, CircleShape)
+                                .background(if (isStrumming) activeAccent else Color.Transparent)
+                                .border(1.5.dp, activeAccent, CircleShape)
                                 .clickable {
                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                     onStrumChord(chord)
@@ -304,7 +311,7 @@ fun ChordLibraryScreen(
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.VolumeUp,
                                 contentDescription = "Strum Chord",
-                                tint = if (isStrumming) Color(0xFF121212) else ShredBrandVolt,
+                                tint = if (isStrumming) onActiveAccent else activeAccent,
                                 modifier = Modifier.size(22.dp)
                             )
                         }
@@ -322,7 +329,8 @@ fun ChordLibraryScreen(
                     ) { targetChord ->
                         FretboardDiagram(
                             chord = targetChord,
-                            primaryColor = ShredBrandVolt,
+                            primaryColor = activeAccent,
+                            onPrimaryColor = onActiveAccent,
                             isEnhanced = showEnhancedView,
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -352,7 +360,7 @@ fun ChordLibraryScreen(
                 fontSize = 13.sp,
                 letterSpacing = 0.5.sp
             ),
-            color = ShredMutedText,
+            color = mutedTextColor,
             modifier = Modifier.fillMaxWidth()
         )
 
@@ -369,42 +377,37 @@ fun ChordLibraryScreen(
                 val isSelected = selectedChord?.id == chord.id
                 Box(
                     modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
                         .clip(RoundedCornerShape(12.dp))
                         .background(
-                            if (isSelected) ShredBrandVolt.copy(alpha = 0.16f) else ShredCardSurface
+                            if (isSelected) activeAccent.copy(alpha = if (isDark) 0.16f else 0.12f) else cardSurface
                         )
                         .border(
                             width = if (isSelected) 1.5.dp else 1.dp,
-                            color = if (isSelected) ShredBrandVolt else ShredCardBorder,
+                            color = if (isSelected) activeAccent else cardBorder,
                             shape = RoundedCornerShape(12.dp)
                         )
                         .clickable {
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             selectedChord = chord
                         }
-                        .padding(vertical = 12.dp, horizontal = 8.dp)
+                        .padding(horizontal = 6.dp)
                         .testTag("chord_item_${chord.id}"),
                     contentAlignment = Alignment.Center
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = chord.name,
-                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                            color = if (isSelected) ShredBrandVolt else ShredPrimaryText,
-                            textAlign = TextAlign.Center
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = "${chord.category} · ${chord.difficulty}",
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Medium
-                            ),
-                            color = ShredMutedText,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
+                    Text(
+                        text = chord.name,
+                        style = MaterialTheme.typography.titleSmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.5.sp
+                        ),
+                        color = if (isSelected) activeAccent else primaryTextColor,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
             }
         }
@@ -412,7 +415,7 @@ fun ChordLibraryScreen(
         // Info popup dialog explaining the diagram key (O, X, dot)
         if (showKeyDialog) {
             ChordDiagramKeyDialog(
-                primaryColor = ShredBrandVolt,
+                primaryColor = activeAccent,
                 onDismiss = { showKeyDialog = false }
             )
         }
@@ -430,10 +433,16 @@ fun ChordLibraryScreen(
 @Composable
 fun FretboardDiagram(
     chord: ChordItem,
-    primaryColor: Color = ShredBrandVolt,
+    primaryColor: Color = MaterialTheme.colorScheme.primary,
+    onPrimaryColor: Color = MaterialTheme.colorScheme.onPrimary,
     isEnhanced: Boolean = false,
     modifier: Modifier = Modifier
 ) {
+    val isDark = LocalIsDarkTheme.current
+    val nutLineColor = if (isDark) ShredNutColor else MaterialTheme.colorScheme.onSurface
+    val fretLineColor = if (isDark) ShredFretGrid else Color(0xFFCBD5E1)
+    val fretTextColor = if (isDark) "#8A8D78" else "#64748B"
+
     Canvas(modifier = modifier) {
         val numStrings = chord.positions.size
         val numFrets = 4 // standard 4 fret window
@@ -450,19 +459,19 @@ fun FretboardDiagram(
         val stringSpacing = fretboardWidth / (numStrings - 1).coerceAtLeast(1)
         val fretSpacing = fretboardHeight / numFrets
 
-        // Nut (top thick bar, anchor line) - bright off-white
+        // Nut (top thick bar, anchor line) - bright off-white in dark, high contrast in light
         drawLine(
-            color = ShredNutColor,
+            color = nutLineColor,
             start = Offset(leftMargin, topMargin),
             end = Offset(leftMargin + fretboardWidth, topMargin),
             strokeWidth = 5.5.dp.toPx()
         )
 
-        // Fret wires (horizontal) - thin 1px/1dp muted gray (#3A3D30)
+        // Fret wires (horizontal) - thin 1px/1dp
         for (fret in 1..numFrets) {
             val y = topMargin + fret * fretSpacing
             drawLine(
-                color = ShredFretGrid,
+                color = fretLineColor,
                 start = Offset(leftMargin, y),
                 end = Offset(leftMargin + fretboardWidth, y),
                 strokeWidth = 1.dp.toPx()
@@ -474,7 +483,7 @@ fun FretboardDiagram(
             val x = leftMargin + i * stringSpacing
             val stringWidth = (1.0f + (numStrings - 1 - i) * 0.25f).dp.toPx()
             drawLine(
-                color = ShredFretGrid.copy(alpha = 0.9f),
+                color = fretLineColor.copy(alpha = 0.9f),
                 start = Offset(x, topMargin),
                 end = Offset(x, topMargin + fretboardHeight),
                 strokeWidth = stringWidth
@@ -484,7 +493,7 @@ fun FretboardDiagram(
         // In Enhanced mode: draw fret numbers (1 to 4) down the left side
         if (isEnhanced) {
             val fretTextPaint = Paint().apply {
-                color = android.graphics.Color.parseColor("#8A8D78")
+                color = android.graphics.Color.parseColor(fretTextColor)
                 textSize = 12.sp.toPx()
                 textAlign = Paint.Align.CENTER
                 typeface = Typeface.DEFAULT_BOLD
@@ -506,7 +515,7 @@ fun FretboardDiagram(
 
         // Paint for finger numbers inside the dots
         val fingerTextPaint = Paint().apply {
-            color = android.graphics.Color.parseColor("#121212")
+            color = onPrimaryColor.toArgb()
             textSize = 11.5.sp.toPx()
             textAlign = Paint.Align.CENTER
             typeface = Typeface.DEFAULT_BOLD
@@ -586,18 +595,24 @@ fun FretboardDiagram(
  */
 @Composable
 fun ChordDiagramKeyDialog(
-    primaryColor: Color = ShredBrandVolt,
+    primaryColor: Color = MaterialTheme.colorScheme.primary,
     onDismiss: () -> Unit
 ) {
+    val isDark = LocalIsDarkTheme.current
+    val dialogSurface = if (isDark) ShredCardSurface else MaterialTheme.colorScheme.surface
+    val dialogBorder = if (isDark) ShredCardBorder else MaterialTheme.colorScheme.outlineVariant
+    val primaryText = if (isDark) ShredPrimaryText else MaterialTheme.colorScheme.onSurface
+    val mutedText = if (isDark) ShredMutedText else MaterialTheme.colorScheme.onSurfaceVariant
+
     Dialog(onDismissRequest = onDismiss) {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(4.dp)
                 .clip(RoundedCornerShape(20.dp))
-                .border(1.5.dp, ShredCardBorder, RoundedCornerShape(20.dp)),
+                .border(1.5.dp, dialogBorder, RoundedCornerShape(20.dp)),
             colors = CardDefaults.cardColors(
-                containerColor = ShredCardSurface
+                containerColor = dialogSurface
             )
         ) {
             Column(
@@ -629,12 +644,12 @@ fun ChordDiagramKeyDialog(
                                     fontWeight = FontWeight.Black,
                                     fontSize = 20.sp
                                 ),
-                                color = ShredPrimaryText
+                                color = primaryText
                             )
                             Text(
                                 text = "How to read chord diagrams",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = ShredMutedText
+                                color = mutedText
                             )
                         }
                     }
@@ -646,7 +661,7 @@ fun ChordDiagramKeyDialog(
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = "Close",
-                            tint = ShredMutedText
+                            tint = mutedText
                         )
                     }
                 }
@@ -780,10 +795,10 @@ fun ChordDiagramKeyDialog(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text("1 = Index", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold), color = ShredPrimaryText)
-                            Text("2 = Middle", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold), color = ShredPrimaryText)
-                            Text("3 = Ring", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold), color = ShredPrimaryText)
-                            Text("4 = Pinky", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold), color = ShredPrimaryText)
+                            Text("1 = Index", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold), color = primaryText)
+                            Text("2 = Middle", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold), color = primaryText)
+                            Text("3 = Ring", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold), color = primaryText)
+                            Text("4 = Pinky", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold), color = primaryText)
                         }
                     }
                 }
@@ -819,11 +834,16 @@ private fun DiagramKeyRow(
     symbolTitle: String,
     description: String
 ) {
+    val isDark = LocalIsDarkTheme.current
+    val rowBackground = if (isDark) ShredCardBorder.copy(alpha = 0.4f) else MaterialTheme.colorScheme.surfaceVariant
+    val primaryText = if (isDark) ShredPrimaryText else MaterialTheme.colorScheme.onSurface
+    val mutedText = if (isDark) ShredMutedText else MaterialTheme.colorScheme.onSurfaceVariant
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .background(ShredCardBorder.copy(alpha = 0.4f))
+            .background(rowBackground)
             .padding(10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -840,23 +860,23 @@ private fun DiagramKeyRow(
                         fontWeight = FontWeight.Black,
                         fontSize = 15.sp
                     ),
-                    color = ShredPrimaryText
+                    color = primaryText
                 )
                 Text(
                     text = "=",
                     style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                    color = ShredMutedText
+                    color = mutedText
                 )
                 Text(
                     text = symbolTitle,
                     style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
-                    color = ShredPrimaryText
+                    color = primaryText
                 )
             }
             Text(
                 text = description,
                 style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
-                color = ShredMutedText
+                color = mutedText
             )
         }
     }

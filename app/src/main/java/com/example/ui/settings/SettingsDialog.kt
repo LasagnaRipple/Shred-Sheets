@@ -22,6 +22,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.PrivacyTip
+import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Vibration
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -66,6 +68,7 @@ fun SettingsDialog(
     onDismiss: () -> Unit
 ) {
     var showLanguagePicker by remember { mutableStateOf(false) }
+    var showPrivacyPolicy by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
 
     Dialog(onDismissRequest = onDismiss) {
@@ -299,6 +302,46 @@ fun SettingsDialog(
                     }
                 }
 
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // --- 5. PRIVACY POLICY BUTTON ---
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
+                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f), RoundedCornerShape(14.dp))
+                        .clickable {
+                            if (settings.hapticsEnabled) {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            }
+                            showPrivacyPolicy = true
+                        }
+                        .padding(14.dp)
+                        .testTag("privacy_policy_button")
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Security,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Privacy Policy", fontWeight = FontWeight.Bold)
+                        }
+                        Text(
+                            text = "100% Free • No Data 🛡️",
+                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+
                 Spacer(modifier = Modifier.height(18.dp))
 
                 // Done Button
@@ -392,5 +435,172 @@ fun SettingsDialog(
                 }
             }
         }
+    }
+
+    if (showPrivacyPolicy) {
+        PrivacyPolicyDialog(
+            onDismiss = { showPrivacyPolicy = false }
+        )
+    }
+}
+
+@Composable
+fun PrivacyPolicyDialog(
+    onDismiss: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(6.dp)
+                .clip(RoundedCornerShape(24.dp))
+                .border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(24.dp)),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface
+            )
+        ) {
+            val scrollState = rememberScrollState()
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp)
+                    .verticalScroll(scrollState),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Header
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Security,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Privacy Policy",
+                            style = MaterialTheme.typography.titleLarge.copy(
+                                fontWeight = FontWeight.Black
+                            ),
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
+                    IconButton(onClick = onDismiss) {
+                        Icon(imageVector = Icons.Default.Close, contentDescription = "Close")
+                    }
+                }
+
+                // Badge
+                Spacer(modifier = Modifier.height(8.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                ) {
+                    Text(
+                        text = "🛡️ 100% Free • Zero Customer Data Collected",
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Policy Text Blocks
+                PolicySection(
+                    title = "1. Zero Personal Data Collected",
+                    content = "Shred Sheets is completely free. We do NOT collect, store, transmit, sell, or share any personal information or customer data. There are no user accounts, passwords, email signups, or tracking cookies."
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                PolicySection(
+                    title = "2. Microphone Access (Audio Tuning)",
+                    content = "The microphone permission (RECORD_AUDIO) is strictly used to capture live sound waves from your instrument in real-time to compute pitch frequency (Hz) and cent offset. Audio processing is 100% in-memory on your device. Audio is NEVER recorded to device storage, never saved, and never transmitted over the internet."
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                PolicySection(
+                    title = "3. Haptic Feedback (Vibration)",
+                    content = "The vibration permission is solely used to deliver optional tactile confirmation when strings are in tune and during metronome beats. No data is collected."
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                PolicySection(
+                    title = "4. Local Device Storage",
+                    content = "Your preferences (such as selected instrument, tuning preset, light/dark theme, and language) are stored solely inside your phone's private storage sandbox. This data never leaves your device and is erased if you uninstall the app."
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                PolicySection(
+                    title = "5. No Ads & No Third-Party Tracking",
+                    content = "Shred Sheets contains no advertisements and does not use analytics SDKs (no Google AdMob, no Firebase Analytics, no tracking libraries). It is completely family-safe and COPPA compliant."
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                PolicySection(
+                    title = "6. Developer Contact",
+                    content = "If you have questions regarding this policy, contact:\nDeveloper: Kyle Silver\nEmail: kylesilver27@gmail.com"
+                )
+
+                Spacer(modifier = Modifier.height(18.dp))
+
+                Button(
+                    onClick = onDismiss,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(46.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary
+                    )
+                ) {
+                    Text(
+                        text = "Understood",
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PolicySection(
+    title: String,
+    content: String
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+            .padding(12.dp)
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+            color = MaterialTheme.colorScheme.primary
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = content,
+            style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.5.sp, lineHeight = 17.sp),
+            color = MaterialTheme.colorScheme.onSurface
+        )
     }
 }

@@ -74,7 +74,7 @@ object ChordRepository {
         ),
         ChordItem(
             id = "g_e_minor",
-            name = "E Minor (Em)",
+            name = "E Minor",
             instrumentType = InstrumentType.GUITAR,
             difficulty = "Beginner",
             category = "Minor",
@@ -91,7 +91,7 @@ object ChordRepository {
         ),
         ChordItem(
             id = "g_a_minor",
-            name = "A Minor (Am)",
+            name = "A Minor",
             instrumentType = InstrumentType.GUITAR,
             difficulty = "Beginner",
             category = "Minor",
@@ -142,7 +142,7 @@ object ChordRepository {
         ),
         ChordItem(
             id = "g_e5_power",
-            name = "E5 Power Chord",
+            name = "E5 Power",
             instrumentType = InstrumentType.GUITAR,
             difficulty = "Power Chord",
             category = "Power",
@@ -159,7 +159,7 @@ object ChordRepository {
         ),
         ChordItem(
             id = "g_a5_power",
-            name = "A5 Power Chord",
+            name = "A5 Power",
             instrumentType = InstrumentType.GUITAR,
             difficulty = "Power Chord",
             category = "Power",
@@ -176,7 +176,7 @@ object ChordRepository {
         ),
         ChordItem(
             id = "g_d5_power",
-            name = "D5 Power Chord",
+            name = "D5 Power",
             instrumentType = InstrumentType.GUITAR,
             difficulty = "Power Chord",
             category = "Power",
@@ -241,7 +241,7 @@ object ChordRepository {
         ),
         ChordItem(
             id = "u_a_minor",
-            name = "A Minor (Am)",
+            name = "A Minor",
             instrumentType = InstrumentType.UKULELE,
             difficulty = "Beginner",
             category = "Minor",
@@ -259,7 +259,7 @@ object ChordRepository {
     val BASS_PATTERNS = listOf(
         ChordItem(
             id = "b_e_root",
-            name = "E Root Groove",
+            name = "E Root",
             instrumentType = InstrumentType.BASS,
             difficulty = "Beginner",
             category = "Groove",
@@ -274,7 +274,7 @@ object ChordRepository {
         ),
         ChordItem(
             id = "b_a_root",
-            name = "A Minor Pentatonic",
+            name = "A Pentatonic",
             instrumentType = InstrumentType.BASS,
             difficulty = "Beginner",
             category = "Groove",

@@ -256,6 +256,8 @@ fun MainAppContent(
                                 onSettingsClick = { viewModel.openSettings() },
                                 onToggleAutoMode = { viewModel.toggleAutoMode() },
                                 onStringSelected = { viewModel.selectString(it) },
+                                onStringHoldStart = { viewModel.startStringHoldLoop(it) },
+                                onStringHoldStop = { viewModel.stopStringHoldLoop() },
                                 onPlayReferenceTone = { viewModel.playReferenceTone() },
                                 onResetTuning = { viewModel.resetTunedStringsProgress() },
                                 onAnagramBarClick = { viewModel.openAnagramDialog() },

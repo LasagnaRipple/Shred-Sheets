@@ -51,6 +51,7 @@ import com.example.ui.components.RockHeader
 import com.example.ui.components.ShakaVisualizer
 import com.example.ui.components.StringPillStrip
 import com.example.ui.theme.InTuneGreen
+import com.example.ui.theme.LocalIsDarkTheme
 import com.example.ui.theme.VibrantDarkBorder
 import com.example.ui.theme.VibrantDarkBorderSubtle
 import com.example.ui.theme.VibrantDarkCard
@@ -80,6 +81,8 @@ fun TunerScreen(
     onSettingsClick: () -> Unit,
     onToggleAutoMode: () -> Unit,
     onStringSelected: (InstrumentString) -> Unit,
+    onStringHoldStart: (InstrumentString) -> Unit = onStringSelected,
+    onStringHoldStop: () -> Unit = {},
     onPlayReferenceTone: () -> Unit,
     onAnagramBarClick: () -> Unit,
     onCycleAnagram: () -> Unit = {},
@@ -94,6 +97,7 @@ fun TunerScreen(
 ) {
     val scrollState = rememberScrollState()
     val haptic = LocalHapticFeedback.current
+    val isDark = LocalIsDarkTheme.current
 
     Column(
         modifier = modifier
@@ -203,6 +207,8 @@ fun TunerScreen(
             anagramWords = anagramWords,
             pluckAnimationEvent = pluckAnimationEvent,
             onStringSelected = onStringSelected,
+            onStringHoldStart = onStringHoldStart,
+            onStringHoldStop = onStringHoldStop,
             modifier = Modifier.fillMaxWidth()
         )
 
@@ -214,8 +220,12 @@ fun TunerScreen(
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 4.dp)
                 .clip(RoundedCornerShape(16.dp))
-                .background(VibrantDarkCard)
-                .border(1.dp, VibrantDarkBorderSubtle, RoundedCornerShape(16.dp))
+                .background(if (isDark) VibrantDarkCard else MaterialTheme.colorScheme.surfaceVariant)
+                .border(
+                    1.dp,
+                    if (isDark) VibrantDarkBorderSubtle else MaterialTheme.colorScheme.outlineVariant,
+                    RoundedCornerShape(16.dp)
+                )
                 .testTag("anagram_banner_pill")
         ) {
             Row(
@@ -236,7 +246,7 @@ fun TunerScreen(
                 ) {
                     SingleLineAnagramText(
                         sentence = anagramSentence,
-                        color = Color.White
+                        color = if (isDark) Color.White else MaterialTheme.colorScheme.onSurface
                     )
                 }
 

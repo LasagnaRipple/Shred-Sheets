@@ -5,12 +5,19 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import com.example.model.AccentColor
 import com.example.model.AppStyleTheme
 import com.example.model.ColorMode
 
-// --- RETAINED EXISTING SCHEMES (EXACT) ---
+/**
+ * CompositionLocal providing whether the active theme is Dark or Light.
+ */
+val LocalIsDarkTheme = staticCompositionLocalOf { true }
+
+// --- RETAINED EXISTING SCHEMES (EXACT - DO NOT ALTER DARK MODE) ---
 // (Existing) Dark mode + rock now = (new) dark + yellow accent
 val RockDarkColorScheme = darkColorScheme(
     primary = RockDarkPrimary,
@@ -34,9 +41,9 @@ val RockDarkColorScheme = darkColorScheme(
 )
 
 val RockLightColorScheme = lightColorScheme(
-    primary = RockLightPrimary,
+    primary = Color(0xFF5E6D00),
     onPrimary = Color.White,
-    primaryContainer = Color(0xFFE8EDE0),
+    primaryContainer = Color(0xFFF4F8E8),
     onPrimaryContainer = Color(0xFF3B4400),
     secondary = RockLightSecondary,
     onSecondary = Color.White,
@@ -44,14 +51,14 @@ val RockLightColorScheme = lightColorScheme(
     onSecondaryContainer = Color(0xFF380054),
     tertiary = RockLightTertiary,
     onTertiary = Color.White,
-    background = RockLightBackground,
-    onBackground = RockLightText,
-    surface = RockLightSurface,
-    onSurface = RockLightText,
-    surfaceVariant = RockLightSurfaceVariant,
-    onSurfaceVariant = RockLightTextSecondary,
-    outline = Color(0xFFCCCCCC),
-    outlineVariant = Color(0xFFE0E0E0)
+    background = Color(0xFFF8FAFC),
+    onBackground = Color(0xFF0F172A),
+    surface = Color.White,
+    onSurface = Color(0xFF0F172A),
+    surfaceVariant = Color(0xFFF1F5F9),
+    onSurfaceVariant = Color(0xFF475569),
+    outline = Color(0xFFCBD5E1),
+    outlineVariant = Color(0xFFE2E8F0)
 )
 
 // (Existing) Dark mode + pop now = (new) dark + blue accent
@@ -203,131 +210,131 @@ private val WhiteDarkColorScheme = darkColorScheme(
     outlineVariant = Color(0xFF333333)
 )
 
-// --- ADDITIONAL ACCENT SCHEMES (LIGHT) ---
+// --- ADDITIONAL ACCENT SCHEMES (LIGHT - OPTIMIZED FOR CRISP LEGIBILITY ACROSS ALL ACCENTS) ---
 private val BlueLightColorScheme = lightColorScheme(
-    primary = Color(0xFF0077B6),
+    primary = Color(0xFF0284C7),          // Sky-600: vibrant oceanic azure, clear on light
     onPrimary = Color.White,
-    primaryContainer = Color(0xFFE1F0F8),
-    onPrimaryContainer = Color(0xFF003B5C),
-    secondary = Color(0xFF0288D1),
+    primaryContainer = Color(0xFFE0F2FE), // Sky-100
+    onPrimaryContainer = Color(0xFF0369A1), // Sky-700
+    secondary = Color(0xFF0284C7),
     onSecondary = Color.White,
-    secondaryContainer = Color(0xFFE1F5FE),
-    onSecondaryContainer = Color(0xFF01579B),
-    tertiary = Color(0xFF009688),
+    secondaryContainer = Color(0xFFE0F2FE),
+    onSecondaryContainer = Color(0xFF0369A1),
+    tertiary = Color(0xFF0F766E),
     onTertiary = Color.White,
-    background = Color(0xFFF4F9FC),
-    onBackground = Color(0xFF142129),
+    background = Color(0xFFF8FAFC),       // Crisp slate-50
+    onBackground = Color(0xFF0F172A),     // Crisp slate-900 high contrast
     surface = Color.White,
-    onSurface = Color(0xFF142129),
-    surfaceVariant = Color(0xFFE5F0F6),
-    onSurfaceVariant = Color(0xFF4C616F),
-    outline = Color(0xFFBBD5E5),
-    outlineVariant = Color(0xFFD6E7F1)
+    onSurface = Color(0xFF0F172A),        // Crisp slate-900 high contrast
+    surfaceVariant = Color(0xFFF1F5F9),   // Slate-100 container for cards & pills
+    onSurfaceVariant = Color(0xFF475569), // Slate-600 readable secondary text
+    outline = Color(0xFFCBD5E1),          // Slate-300
+    outlineVariant = Color(0xFFE2E8F0)    // Slate-200
 )
 
 private val OrangeLightColorScheme = lightColorScheme(
-    primary = Color(0xFFE65100),
+    primary = Color(0xFFEA580C),          // Orange-600: punchy, high-contrast orange
     onPrimary = Color.White,
-    primaryContainer = Color(0xFFFFECE0),
-    onPrimaryContainer = Color(0xFF5C1D00),
-    secondary = Color(0xFFF57C00),
+    primaryContainer = Color(0xFFFFEDD5), // Orange-100
+    onPrimaryContainer = Color(0xFF9A3412), // Orange-800
+    secondary = Color(0xFFEA580C),
     onSecondary = Color.White,
-    secondaryContainer = Color(0xFFFFF3E0),
-    onSecondaryContainer = Color(0xFFE65100),
-    tertiary = Color(0xFF8D6E63),
+    secondaryContainer = Color(0xFFFFEDD5),
+    onSecondaryContainer = Color(0xFF9A3412),
+    tertiary = Color(0xFF78350F),
     onTertiary = Color.White,
-    background = Color(0xFFFFF9F5),
-    onBackground = Color(0xFF281A12),
+    background = Color(0xFFFAF7F5),       // Warm off-white
+    onBackground = Color(0xFF1C1917),     // Stone-900
     surface = Color.White,
-    onSurface = Color(0xFF281A12),
-    surfaceVariant = Color(0xFFFCECE0),
-    onSurfaceVariant = Color(0xFF6B584E),
-    outline = Color(0xFFE8D0C0),
-    outlineVariant = Color(0xFFF2E3D8)
+    onSurface = Color(0xFF1C1917),
+    surfaceVariant = Color(0xFFF5F5F4),   // Stone-100
+    onSurfaceVariant = Color(0xFF57534E), // Stone-600
+    outline = Color(0xFFD6D3D1),          // Stone-300
+    outlineVariant = Color(0xFFE7E5E4)    // Stone-200
 )
 
 private val PurpleLightColorScheme = lightColorScheme(
-    primary = Color(0xFF7B1FA2),
+    primary = Color(0xFF9333EA),          // Purple-600: rich electric violet
     onPrimary = Color.White,
-    primaryContainer = Color(0xFFF6E8FC),
-    onPrimaryContainer = Color(0xFF380054),
-    secondary = Color(0xFF9C27B0),
+    primaryContainer = Color(0xFFF3E8FF), // Purple-100
+    onPrimaryContainer = Color(0xFF6B21A8), // Purple-800
+    secondary = Color(0xFF9333EA),
     onSecondary = Color.White,
-    secondaryContainer = Color(0xFFF3E5F5),
-    onSecondaryContainer = Color(0xFF4A148C),
-    tertiary = Color(0xFFC2185B),
+    secondaryContainer = Color(0xFFF3E8FF),
+    onSecondaryContainer = Color(0xFF6B21A8),
+    tertiary = Color(0xFFBE185D),
     onTertiary = Color.White,
-    background = Color(0xFFFAF5FC),
-    onBackground = Color(0xFF231429),
+    background = Color(0xFFFAFAFC),
+    onBackground = Color(0xFF111827),     // Gray-900
     surface = Color.White,
-    onSurface = Color(0xFF231429),
-    surfaceVariant = Color(0xFFF2E5F6),
-    onSurfaceVariant = Color(0xFF644F6C),
-    outline = Color(0xFFDEC5E7),
-    outlineVariant = Color(0xFFEDE0F3)
+    onSurface = Color(0xFF111827),
+    surfaceVariant = Color(0xFFF3F4F6),   // Gray-100
+    onSurfaceVariant = Color(0xFF4B5563), // Gray-600
+    outline = Color(0xFFD1D5DB),          // Gray-300
+    outlineVariant = Color(0xFFE5E7EB)    // Gray-200
 )
 
 private val GreenLightColorScheme = lightColorScheme(
-    primary = Color(0xFF1B803A),
+    primary = Color(0xFF16A34A),          // Green-600: deep vibrant emerald
     onPrimary = Color.White,
-    primaryContainer = Color(0xFFE4F7EA),
-    onPrimaryContainer = Color(0xFF003B14),
-    secondary = Color(0xFF2E7D32),
+    primaryContainer = Color(0xFFDCFCE7), // Green-100
+    onPrimaryContainer = Color(0xFF166534), // Green-800
+    secondary = Color(0xFF16A34A),
     onSecondary = Color.White,
-    secondaryContainer = Color(0xFFE8F5E9),
-    onSecondaryContainer = Color(0xFF1B5E20),
-    tertiary = Color(0xFF00796B),
+    secondaryContainer = Color(0xFFDCFCE7),
+    onSecondaryContainer = Color(0xFF166534),
+    tertiary = Color(0xFF0F766E),
     onTertiary = Color.White,
-    background = Color(0xFFF4FAF5),
-    onBackground = Color(0xFF132317),
+    background = Color(0xFFF8FAF9),
+    onBackground = Color(0xFF0F172A),
     surface = Color.White,
-    onSurface = Color(0xFF132317),
-    surfaceVariant = Color(0xFFE0EFE4),
-    onSurfaceVariant = Color(0xFF4F6855),
-    outline = Color(0xFFBEDBC5),
-    outlineVariant = Color(0xFFD6EBDC)
+    onSurface = Color(0xFF0F172A),
+    surfaceVariant = Color(0xFFF0FDF4),   // Subtle mint-tinted clean container
+    onSurfaceVariant = Color(0xFF374151),
+    outline = Color(0xFFCBD5E1),
+    outlineVariant = Color(0xFFE2E8F0)
 )
 
 private val RedLightColorScheme = lightColorScheme(
-    primary = Color(0xFFC62828),
+    primary = Color(0xFFE11D48),          // Rose-600: bold, energetic crimson
     onPrimary = Color.White,
-    primaryContainer = Color(0xFFFFEAEA),
-    onPrimaryContainer = Color(0xFF4E0606),
-    secondary = Color(0xFFD32F2F),
+    primaryContainer = Color(0xFFFFE4E6), // Rose-100
+    onPrimaryContainer = Color(0xFF9F1239), // Rose-800
+    secondary = Color(0xFFE11D48),
     onSecondary = Color.White,
-    secondaryContainer = Color(0xFFFFEBEE),
-    onSecondaryContainer = Color(0xFFB71C1C),
-    tertiary = Color(0xFFFF6F00),
+    secondaryContainer = Color(0xFFFFE4E6),
+    onSecondaryContainer = Color(0xFF9F1239),
+    tertiary = Color(0xFFC2410C),
     onTertiary = Color.White,
-    background = Color(0xFFFFF6F6),
-    onBackground = Color(0xFF271313),
+    background = Color(0xFFFAF9F9),
+    onBackground = Color(0xFF1C1917),
     surface = Color.White,
-    onSurface = Color(0xFF271313),
-    surfaceVariant = Color(0xFFFCE6E6),
-    onSurfaceVariant = Color(0xFF6E5151),
-    outline = Color(0xFFECC2C2),
-    outlineVariant = Color(0xFFF5D6D6)
+    onSurface = Color(0xFF1C1917),
+    surfaceVariant = Color(0xFFF5F5F4),
+    onSurfaceVariant = Color(0xFF57534E),
+    outline = Color(0xFFD6D3D1),
+    outlineVariant = Color(0xFFE7E5E4)
 )
 
 private val BlackLightColorScheme = lightColorScheme(
-    primary = Color(0xFF121212),
+    primary = Color(0xFF0F172A),          // Slate-900: sharp black/dark slate
     onPrimary = Color.White,
-    primaryContainer = Color(0xFFE5E5E5),
-    onPrimaryContainer = Color(0xFF121212),
-    secondary = Color(0xFF424242),
+    primaryContainer = Color(0xFFE2E8F0), // Slate-200
+    onPrimaryContainer = Color(0xFF0F172A),
+    secondary = Color(0xFF334155),
     onSecondary = Color.White,
-    secondaryContainer = Color(0xFFEEEEEE),
-    onSecondaryContainer = Color(0xFF212121),
-    tertiary = Color(0xFF616161),
+    secondaryContainer = Color(0xFFE2E8F0),
+    onSecondaryContainer = Color(0xFF1E293B),
+    tertiary = Color(0xFF475569),
     onTertiary = Color.White,
-    background = Color(0xFFF8F9FA),
-    onBackground = Color(0xFF121212),
+    background = Color(0xFFF8FAFC),
+    onBackground = Color(0xFF0F172A),
     surface = Color.White,
-    onSurface = Color(0xFF121212),
-    surfaceVariant = Color(0xFFEEEEEE),
-    onSurfaceVariant = Color(0xFF555555),
-    outline = Color(0xFFCCCCCC),
-    outlineVariant = Color(0xFFE0E0E0)
+    onSurface = Color(0xFF0F172A),
+    surfaceVariant = Color(0xFFF1F5F9),
+    onSurfaceVariant = Color(0xFF475569),
+    outline = Color(0xFFCBD5E1),
+    outlineVariant = Color(0xFFE2E8F0)
 )
 
 @Composable
@@ -383,10 +390,12 @@ fun ShredSheetsTheme(
         }
     }
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = Typography,
-        content = content
-    )
+    CompositionLocalProvider(LocalIsDarkTheme provides isDark) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = Typography,
+            content = content
+        )
+    }
 }
 

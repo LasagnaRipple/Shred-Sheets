@@ -58,6 +58,7 @@ import androidx.compose.ui.unit.sp
 import com.example.model.InstrumentString
 import com.example.model.InstrumentType
 import com.example.model.PitchResult
+import com.example.ui.theme.LocalIsDarkTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -96,6 +97,7 @@ fun ShakaVisualizer(
     modifier: Modifier = Modifier
 ) {
     val haptic = LocalHapticFeedback.current
+    val isDark = LocalIsDarkTheme.current
 
     // Raw state calculation from pitch sensor
     val rawState = remember(isTunerActive, hasSignal, pitchResult, isAllStringsTuned) {
@@ -170,10 +172,10 @@ fun ShakaVisualizer(
 
     // Colors per spec
     val borderColorTarget = when (debouncedState) {
-        CircleTunerState.READY -> Color(0xFF4A4D3A)
+        CircleTunerState.READY -> if (isDark) Color(0xFF4A4D3A) else MaterialTheme.colorScheme.outlineVariant
         CircleTunerState.FLAT, CircleTunerState.SHARP -> Color(0xFFD85A30)
         CircleTunerState.CLOSE_FLAT, CircleTunerState.CLOSE_SHARP -> Color(0xFFEF9F27)
-        CircleTunerState.PERFECT -> Color(0xFFC8FF3D)
+        CircleTunerState.PERFECT -> if (isDark) Color(0xFFC8FF3D) else Color(0xFF16A34A)
     }
     val borderColor by animateColorAsState(targetValue = borderColorTarget, label = "circleBorderColor")
 
@@ -188,18 +190,33 @@ fun ShakaVisualizer(
     val (badgeText, badgeTextColor, badgeBg) = when (debouncedState) {
         CircleTunerState.READY -> {
             val text = if (!isTunerActive) "Tap to start" else "Pluck a string"
-            Triple(text, Color(0xFF8A8D78), Color.Transparent)
+            val textColor = if (isDark) Color(0xFF8A8D78) else MaterialTheme.colorScheme.onSurfaceVariant
+            Triple(text, textColor, Color.Transparent)
         }
-        CircleTunerState.FLAT -> Triple("Flat — tune up", Color(0xFFF0997B), Color(0xFF4A1B0C))
-        CircleTunerState.SHARP -> Triple("Sharp — tune down", Color(0xFFF0997B), Color(0xFF4A1B0C))
-        CircleTunerState.CLOSE_FLAT, CircleTunerState.CLOSE_SHARP -> Triple("Almost there", Color(0xFFFAEC9F), Color(0xFF412402))
+        CircleTunerState.FLAT -> {
+            val textColor = if (isDark) Color(0xFFF0997B) else Color(0xFF991B1B)
+            val bg = if (isDark) Color(0xFF4A1B0C) else Color(0xFFFEE2E2)
+            Triple("Flat — tune up", textColor, bg)
+        }
+        CircleTunerState.SHARP -> {
+            val textColor = if (isDark) Color(0xFFF0997B) else Color(0xFF991B1B)
+            val bg = if (isDark) Color(0xFF4A1B0C) else Color(0xFFFEE2E2)
+            Triple("Sharp — tune down", textColor, bg)
+        }
+        CircleTunerState.CLOSE_FLAT, CircleTunerState.CLOSE_SHARP -> {
+            val textColor = if (isDark) Color(0xFFFAEC9F) else Color(0xFF854D0E)
+            val bg = if (isDark) Color(0xFF412402) else Color(0xFFFEF3C7)
+            Triple("Almost there", textColor, bg)
+        }
         CircleTunerState.PERFECT -> {
             val text = when {
                 isAllStringsTuned -> "Time to shred! 🎸"
                 isStringConfirmed -> "Locked in! ✓"
                 else -> "Perfect — in tune!"
             }
-            Triple(text, Color(0xFF9FE1CB), Color(0xFF04342C))
+            val textColor = if (isDark) Color(0xFF9FE1CB) else Color(0xFF166534)
+            val bg = if (isDark) Color(0xFF04342C) else Color(0xFFDCFCE7)
+            Triple(text, textColor, bg)
         }
     }
 
@@ -295,13 +312,14 @@ fun ShakaVisualizer(
         ) {
             // Subtle celebratory glow when perfect or confirmed
             if (debouncedState == CircleTunerState.PERFECT || confirmedFlashAlpha.value > 0.01f) {
+                val glowBaseColor = if (isDark) Color(0xFFC8FF3D) else Color(0xFF16A34A)
                 Canvas(modifier = Modifier.size(154.dp)) {
                     val glowAlpha = (0.28f * successPulseScale + 0.45f * confirmedFlashAlpha.value).coerceAtMost(1f)
                     drawCircle(
                         brush = Brush.radialGradient(
                             colors = listOf(
-                                Color(0xFFC8FF3D).copy(alpha = glowAlpha),
-                                Color(0xFFC8FF3D).copy(alpha = 0.08f),
+                                glowBaseColor.copy(alpha = glowAlpha),
+                                glowBaseColor.copy(alpha = 0.08f),
                                 Color.Transparent
                             ),
                             center = center,
@@ -316,7 +334,7 @@ fun ShakaVisualizer(
                 modifier = Modifier
                     .size(124.dp)
                     .clip(CircleShape)
-                    .background(Color(0xFF151A12))
+                    .background(if (isDark) Color(0xFF151A12) else MaterialTheme.colorScheme.surface)
                     .border(2.dp, borderColor, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
@@ -343,7 +361,7 @@ fun ShakaVisualizer(
                 ) { state ->
                     when (state) {
                         CircleTunerState.READY -> {
-                            // Play / idle icon (#8A8D78)
+                            // Play / idle icon
                             Canvas(modifier = Modifier.size(34.dp)) {
                                 val w = size.width
                                 val h = size.height
@@ -353,7 +371,7 @@ fun ShakaVisualizer(
                                     lineTo(w * 0.28f, h * 0.84f)
                                     close()
                                 }
-                                drawPath(path = path, color = Color(0xFF8A8D78))
+                                drawPath(path = path, color = if (isDark) Color(0xFF8A8D78) else primaryColor)
                             }
                         }
                         CircleTunerState.FLAT, CircleTunerState.SHARP -> {

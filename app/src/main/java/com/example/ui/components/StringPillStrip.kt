@@ -7,6 +7,9 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,14 +34,20 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.model.InstrumentString
+import com.example.ui.theme.LocalIsDarkTheme
 import com.example.ui.theme.VibrantDarkBorder
 import com.example.ui.theme.VibrantDarkCard
 
@@ -53,6 +62,8 @@ fun StringPillStrip(
     anagramWords: List<String>,
     pluckAnimationEvent: Pair<Int, Long>? = null,
     onStringSelected: (InstrumentString) -> Unit,
+    onStringHoldStart: (InstrumentString) -> Unit = onStringSelected,
+    onStringHoldStop: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val haptic = LocalHapticFeedback.current
@@ -89,15 +100,17 @@ fun StringPillStrip(
                     label = "stringPillScale"
                 )
 
+                val isDark = LocalIsDarkTheme.current
+
                 // Row States:
-                // 1. Active: Currently selected/being tuned -> Bright highlight (yellow / primary)
+                // 1. Active: Currently selected/being tuned -> Bright highlight (primary)
                 // 2. Done: Confirmed in tune this session -> Filled green circle with checkmark, dimmed slightly so it recedes
-                // 3. Untuned: Not yet confirmed in tune -> Dimmed/gray circle
+                // 3. Untuned: Not yet confirmed in tune -> Theme card / pill surface
                 val circleBgColor by animateColorAsState(
                     targetValue = when {
                         isSelected -> MaterialTheme.colorScheme.primary
-                        isTuned -> Color(0xFF1B4D3E)
-                        else -> VibrantDarkCard
+                        isTuned -> if (isDark) Color(0xFF1B4D3E) else Color(0xFFDCFCE7)
+                        else -> if (isDark) VibrantDarkCard else MaterialTheme.colorScheme.surfaceVariant
                     },
                     label = "circleBgColor"
                 )
@@ -105,8 +118,8 @@ fun StringPillStrip(
                 val textColor by animateColorAsState(
                     targetValue = when {
                         isSelected -> MaterialTheme.colorScheme.onPrimary
-                        isTuned -> Color(0xFF9FE1CB)
-                        else -> Color.White
+                        isTuned -> if (isDark) Color(0xFF9FE1CB) else Color(0xFF15803D)
+                        else -> if (isDark) Color.White else MaterialTheme.colorScheme.onSurface
                     },
                     label = "textColor"
                 )
@@ -114,8 +127,8 @@ fun StringPillStrip(
                 val dotColor by animateColorAsState(
                     targetValue = when {
                         isSelected -> MaterialTheme.colorScheme.primary
-                        isTuned -> Color(0xFF2E7D32)
-                        else -> Color(0xFF4B5563)
+                        isTuned -> if (isDark) Color(0xFF2E7D32) else Color(0xFF16A34A)
+                        else -> if (isDark) Color(0xFF4B5563) else MaterialTheme.colorScheme.outline
                     },
                     label = "dotColor"
                 )
@@ -124,9 +137,25 @@ fun StringPillStrip(
                 Column(
                     modifier = Modifier
                         .weight(1f)
-                        .clickable {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            onStringSelected(instString)
+                        .semantics {
+                            role = Role.Button
+                            onClick {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                onStringSelected(instString)
+                                true
+                            }
+                        }
+                        .pointerInput(instString) {
+                            awaitEachGesture {
+                                awaitFirstDown(requireUnconsumed = false)
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                onStringHoldStart(instString)
+                                try {
+                                    waitForUpOrCancellation()
+                                } finally {
+                                    onStringHoldStop()
+                                }
+                            }
                         }
                         .padding(vertical = 4.dp)
                         .testTag("string_pill_${instString.stringNumber}"),
@@ -143,8 +172,8 @@ fun StringPillStrip(
                                 width = if (isSelected) 0.dp else 1.5.dp,
                                 color = when {
                                     isSelected -> Color.Transparent
-                                    isTuned -> Color(0xFF2E7D32)
-                                    else -> VibrantDarkBorder
+                                    isTuned -> if (isDark) Color(0xFF2E7D32) else Color(0xFF86EFAC)
+                                    else -> if (isDark) VibrantDarkBorder else MaterialTheme.colorScheme.outlineVariant
                                 },
                                 shape = CircleShape
                             ),
@@ -179,7 +208,11 @@ fun StringPillStrip(
                             fontSize = 10.sp,
                             fontWeight = if (isSelected) FontWeight.Black else FontWeight.Bold
                         ),
-                        color = if (isSelected) MaterialTheme.colorScheme.primary else Color(0xFF9CA3AF),
+                        color = if (isSelected) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            if (isDark) Color(0xFF9CA3AF) else MaterialTheme.colorScheme.onSurfaceVariant
+                        },
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         textAlign = TextAlign.Center,

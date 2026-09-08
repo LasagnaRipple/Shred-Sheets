@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.sp
 import com.example.model.InstrumentString
 import com.example.model.PitchResult
 import com.example.ui.theme.CloseYellow
+import com.example.ui.theme.LocalIsDarkTheme
 import com.example.ui.theme.OutOfTuneRed
 import com.example.ui.theme.VibrantDarkBorder
 import com.example.ui.theme.VibrantDarkCard
@@ -117,7 +118,7 @@ fun PitchRulerGauge(
 
     LaunchedEffect(pluckAnimationEvent) {
         val event = pluckAnimationEvent ?: return@LaunchedEffect
-        val strIndex = (event.first - 1).coerceIn(0, (stringCount - 1).coerceAtLeast(0))
+        val strIndex = (stringCount - event.first).coerceIn(0, (stringCount - 1).coerceAtLeast(0))
         vibratingStringIndex = strIndex
         // Oscillating vibration sequence mimicking a plucked physical string
         pluckAnim.snapTo(1f)
@@ -136,12 +137,17 @@ fun PitchRulerGauge(
         vibratingStringIndex = null
     }
 
+    val isDark = LocalIsDarkTheme.current
+
     Box(
         modifier = modifier
             .fillMaxWidth()
             .height(112.dp)
             .clip(RoundedCornerShape(20.dp))
-            .background(Color(0xFF14191F))
+            .background(if (isDark) Color(0xFF14191F) else MaterialTheme.colorScheme.surfaceVariant)
+            .then(
+                if (!isDark) Modifier.border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(20.dp)) else Modifier
+            )
             .testTag("pitch_ruler_gauge"),
         contentAlignment = Alignment.Center
     ) {
@@ -155,8 +161,8 @@ fun PitchRulerGauge(
             val centerY = height / 2f
             val centerX = width / 2f
 
-            val minorTickColor = Color(0xFF2A3440)
-            val majorTickColor = Color(0xFF4A5666)
+            val minorTickColor = if (isDark) Color(0xFF2A3440) else Color(0xFFCBD5E1)
+            val majorTickColor = if (isDark) Color(0xFF4A5666) else Color(0xFF94A3B8)
             val minorTickHeight = height * 0.42f
             val majorTickHeight = height * 0.68f
 
@@ -186,8 +192,8 @@ fun PitchRulerGauge(
                 val tickColor = when {
                     isVibrating -> statusColor
                     isCenter && isInTune && hasSignal && isTunerActive -> statusColor
-                    isStringCenter -> Color(0xFF5A6A7C)
-                    isCenter -> Color(0xFF3B4856)
+                    isStringCenter -> if (isDark) Color(0xFF5A6A7C) else Color(0xFF64748B)
+                    isCenter -> if (isDark) Color(0xFF3B4856) else Color(0xFF475569)
                     else -> minorTickColor
                 }
 
@@ -238,7 +244,7 @@ fun PitchRulerGauge(
             }
             drawPath(
                 path = caretPath,
-                color = if (isInTune && hasSignal && isTunerActive) statusColor else Color(0xFF4A5666)
+                color = if (isInTune && hasSignal && isTunerActive) statusColor else (if (isDark) Color(0xFF4A5666) else Color(0xFF94A3B8))
             )
 
             // Draw active sweeping needle
@@ -271,7 +277,7 @@ fun PitchRulerGauge(
                 val needleHeight = height * 0.70f
                 val needleWidth = 2.8.dp.toPx()
                 drawLine(
-                    color = Color(0xFF333E4C),
+                    color = if (isDark) Color(0xFF333E4C) else Color(0xFF94A3B8),
                     start = Offset(centerX, centerY - needleHeight / 2f),
                     end = Offset(centerX, centerY + needleHeight / 2f),
                     strokeWidth = needleWidth,

@@ -63,6 +63,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.ui.theme.LocalIsDarkTheme
 import com.example.ui.theme.VibrantDarkBorder
 import com.example.ui.theme.VibrantDarkCard
 import com.example.ui.theme.VibrantDarkSurface
@@ -139,6 +140,7 @@ fun MetronomeScreen(
 
     val activeAccentColor = MaterialTheme.colorScheme.primary
     val backgroundColor = MaterialTheme.colorScheme.background
+    val isDark = LocalIsDarkTheme.current
 
     Column(
         modifier = modifier
@@ -199,6 +201,7 @@ fun MetronomeScreen(
                 modifier = Modifier
                     .size(46.dp)
                     .clip(CircleShape)
+                    .background(if (isDark) Color.Transparent else MaterialTheme.colorScheme.surfaceVariant)
                     .border(1.5.dp, activeAccentColor, CircleShape)
                     .clickable {
                         triggerStrongTick()
@@ -210,7 +213,7 @@ fun MetronomeScreen(
                 Icon(
                     imageVector = Icons.Default.Remove,
                     contentDescription = "Decrease BPM",
-                    tint = Color.White,
+                    tint = if (isDark) Color.White else MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.size(22.dp)
                 )
             }
@@ -226,7 +229,7 @@ fun MetronomeScreen(
                         fontWeight = FontWeight.Black,
                         letterSpacing = (-1).sp
                     ),
-                    color = Color.White,
+                    color = if (isDark) Color.White else MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.testTag("bpm_text_display")
                 )
                 Text(
@@ -235,7 +238,7 @@ fun MetronomeScreen(
                         fontWeight = FontWeight.Medium,
                         fontSize = 14.sp
                     ),
-                    color = Color(0xFF9CA3AF)
+                    color = if (isDark) Color(0xFF9CA3AF) else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
@@ -244,6 +247,7 @@ fun MetronomeScreen(
                 modifier = Modifier
                     .size(46.dp)
                     .clip(CircleShape)
+                    .background(if (isDark) Color.Transparent else MaterialTheme.colorScheme.surfaceVariant)
                     .border(1.5.dp, activeAccentColor, CircleShape)
                     .clickable {
                         triggerStrongTick()
@@ -255,7 +259,7 @@ fun MetronomeScreen(
                 Icon(
                     imageVector = Icons.Default.Add,
                     contentDescription = "Increase BPM",
-                    tint = Color.White,
+                    tint = if (isDark) Color.White else MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.size(22.dp)
                 )
             }
@@ -355,7 +359,7 @@ fun MetronomeScreen(
                     val endY = center.y + outerRadius * sinRad
 
                     drawLine(
-                        color = Color(0xFF3F4652),
+                        color = if (isDark) Color(0xFF3F4652) else Color(0xFFCBD5E1),
                         start = Offset(startX, startY),
                         end = Offset(endX, endY),
                         strokeWidth = 2.dp.toPx(),
@@ -365,7 +369,7 @@ fun MetronomeScreen(
 
                 // Milestone Labels: 30, 75, 135, 195, 240
                 val textPaint = Paint().apply {
-                    color = android.graphics.Color.parseColor("#8B949E")
+                    color = if (isDark) android.graphics.Color.parseColor("#8B949E") else android.graphics.Color.parseColor("#64748B")
                     textSize = 12.sp.toPx()
                     isAntiAlias = true
                     textAlign = Paint.Align.CENTER
@@ -420,8 +424,12 @@ fun MetronomeScreen(
                 modifier = Modifier
                     .size(innerPodSize)
                     .clip(CircleShape)
-                    .background(Color(0xFF16181D))
-                    .border(1.dp, Color(0xFF2E333D), CircleShape)
+                    .background(if (isDark) Color(0xFF16181D) else MaterialTheme.colorScheme.surface)
+                    .border(
+                        1.dp,
+                        if (isDark) Color(0xFF2E333D) else MaterialTheme.colorScheme.outlineVariant,
+                        CircleShape
+                    )
             ) {
                 Column(
                     modifier = Modifier.fillMaxSize()
@@ -452,7 +460,7 @@ fun MetronomeScreen(
                             .fillMaxWidth()
                             .height(1.dp)
                             .padding(horizontal = 24.dp)
-                            .background(Color(0xFF2E333D))
+                            .background(if (isDark) Color(0xFF2E333D) else MaterialTheme.colorScheme.outlineVariant)
                     )
 
                     // Bottom Half: Tap Tempo Button (standalone finger tap emoji)
@@ -492,7 +500,7 @@ fun MetronomeScreen(
                     targetValue = when {
                         isActive && isAccent -> activeAccentColor
                         isActive -> activeAccentColor.copy(alpha = 0.9f)
-                        else -> Color(0xFF4B5563)
+                        else -> if (isDark) Color(0xFF4B5563) else MaterialTheme.colorScheme.outlineVariant
                     },
                     animationSpec = tween(durationMillis = 80),
                     label = "dotColor"
@@ -538,6 +546,7 @@ fun MetronomeScreen(
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(24.dp))
+                    .background(if (isDark) Color.Transparent else MaterialTheme.colorScheme.surfaceVariant)
                     .border(1.5.dp, activeAccentColor, RoundedCornerShape(24.dp))
                     .clickable {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -553,7 +562,7 @@ fun MetronomeScreen(
                         fontWeight = FontWeight.Bold,
                         fontSize = 16.sp
                     ),
-                    color = Color.White
+                    color = if (isDark) Color.White else MaterialTheme.colorScheme.onSurface
                 )
             }
 
@@ -565,7 +574,7 @@ fun MetronomeScreen(
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Normal
                 ),
-                color = Color(0xFF9CA3AF)
+                color = if (isDark) Color(0xFF9CA3AF) else MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
@@ -575,11 +584,11 @@ fun MetronomeScreen(
         val signatures = listOf(2 to "2/4", 3 to "3/4", 4 to "4/4", 6 to "6/8")
         AlertDialog(
             onDismissRequest = { showTimeSigDialog = false },
-            containerColor = VibrantDarkSurface,
+            containerColor = if (isDark) VibrantDarkSurface else MaterialTheme.colorScheme.surface,
             title = {
                 Text(
                     text = "Select Time Signature",
-                    color = Color.White,
+                    color = if (isDark) Color.White else MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.Bold
                 )
             },
@@ -594,10 +603,14 @@ fun MetronomeScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(12.dp))
-                                .background(if (isSelected) activeAccentColor.copy(alpha = 0.15f) else VibrantDarkCard)
+                                .background(
+                                    if (isSelected) activeAccentColor.copy(alpha = 0.15f)
+                                    else if (isDark) VibrantDarkCard else MaterialTheme.colorScheme.surfaceVariant
+                                )
                                 .border(
                                     1.5.dp,
-                                    if (isSelected) activeAccentColor else VibrantDarkBorder,
+                                    if (isSelected) activeAccentColor
+                                    else if (isDark) VibrantDarkBorder else MaterialTheme.colorScheme.outlineVariant,
                                     RoundedCornerShape(12.dp)
                                 )
                                 .clickable {
@@ -613,7 +626,7 @@ fun MetronomeScreen(
                                 style = MaterialTheme.typography.titleMedium.copy(
                                     fontWeight = FontWeight.Bold
                                 ),
-                                color = if (isSelected) activeAccentColor else Color.White
+                                color = if (isSelected) activeAccentColor else if (isDark) Color.White else MaterialTheme.colorScheme.onSurface
                             )
                         }
                     }
@@ -631,11 +644,11 @@ fun MetronomeScreen(
     if (showTempoInfoDialog) {
         AlertDialog(
             onDismissRequest = { showTempoInfoDialog = false },
-            containerColor = VibrantDarkSurface,
+            containerColor = if (isDark) VibrantDarkSurface else MaterialTheme.colorScheme.surface,
             title = {
                 Text(
                     text = "Tempo Markings ⏱️",
-                    color = Color.White,
+                    color = if (isDark) Color.White else MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.Bold
                 )
             },
@@ -657,7 +670,10 @@ fun MetronomeScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(VibrantDarkCard)
+                                .background(if (isDark) VibrantDarkCard else MaterialTheme.colorScheme.surfaceVariant)
+                                .then(
+                                    if (!isDark) Modifier.border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp)) else Modifier
+                                )
                                 .padding(horizontal = 12.dp, vertical = 8.dp)
                         ) {
                             Text(
@@ -668,7 +684,7 @@ fun MetronomeScreen(
                             )
                             Text(
                                 text = desc,
-                                color = Color(0xFF9CA3AF),
+                                color = if (isDark) Color(0xFF9CA3AF) else MaterialTheme.colorScheme.onSurfaceVariant,
                                 style = MaterialTheme.typography.bodySmall
                             )
                         }

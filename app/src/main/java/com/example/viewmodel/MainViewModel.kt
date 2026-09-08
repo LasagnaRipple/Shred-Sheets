@@ -41,8 +41,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val toneSynthesizer = ToneSynthesizer()
     val hapticManager = HapticFeedbackManager(application)
 
-    // App Settings loaded from persistent storage
-    private val _settings = MutableStateFlow(settingsPreferences.loadSettings())
+    // App Settings loaded from persistent storage (Auto detect default ON on load/return)
+    private val _settings = MutableStateFlow(
+        settingsPreferences.loadSettings().copy(tunerMode = com.example.model.TunerMode.AUTO)
+    )
     val settings: StateFlow<AppSettings> = _settings.asStateFlow()
 
     // Active Navigation Tab
@@ -137,6 +139,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val hasMicPermission: StateFlow<Boolean> = _hasMicPermission.asStateFlow()
 
     init {
+        // Pre-warm audio synthesizer for instantaneous sub-10ms response when tapping strings
+        toneSynthesizer.warmUp()
+
         // Initialize default string from guitar standard
         val currentTuning = getCurrentTuning()
         _selectedString.value = currentTuning.strings.firstOrNull()
@@ -319,6 +324,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setAppForeground(isForeground: Boolean) {
         isAppInForeground = isForeground
+        if (isForeground) {
+            // When returning to the app, Auto detect is toggled to ON
+            _settings.value = _settings.value.copy(tunerMode = com.example.model.TunerMode.AUTO)
+            toneSynthesizer.warmUp()
+        } else {
+            stopStringHoldLoop()
+            toneSynthesizer.release()
+        }
         updateListeningState()
     }
 
@@ -375,7 +388,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun selectTab(tab: AppTab) {
+        stopStringHoldLoop()
+        val previousTab = _currentTab.value
         _currentTab.value = tab
+        if (tab == AppTab.TUNER && previousTab != AppTab.TUNER) {
+            // When returning to the tuner tab, toggle Auto detect to ON
+            _settings.value = _settings.value.copy(tunerMode = com.example.model.TunerMode.AUTO)
+        }
         updateListeningState()
         if (_settings.value.hapticsEnabled) {
             hapticManager.performLightTick()
@@ -383,12 +402,44 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun toggleAutoMode() {
+        stopStringHoldLoop()
         val current = _settings.value.tunerMode
         val next = if (current == com.example.model.TunerMode.AUTO) com.example.model.TunerMode.MANUAL else com.example.model.TunerMode.AUTO
         _settings.value = _settings.value.copy(tunerMode = next)
         if (_settings.value.hapticsEnabled) {
             hapticManager.performLightTick()
         }
+    }
+
+    private var stringHoldLoopJob: kotlinx.coroutines.Job? = null
+
+    /**
+     * Starts continuous looping of the string tone at 120 BPM (500ms interval) while finger is held down.
+     */
+    fun startStringHoldLoop(string: InstrumentString) {
+        selectString(string)
+        stringHoldLoopJob?.cancel()
+        stringHoldLoopJob = viewModelScope.launch {
+            // 120 BPM = 60,000 ms / 120 = 500 ms per stroke
+            while (isActive) {
+                delay(500L)
+                if (_settings.value.soundEffectsEnabled) {
+                    toneSynthesizer.playPluckedTone(string.targetFrequency)
+                }
+                _pluckAnimationEvent.value = Pair(string.stringNumber, System.currentTimeMillis())
+                if (_settings.value.hapticsEnabled) {
+                    hapticManager.performLightTick()
+                }
+            }
+        }
+    }
+
+    /**
+     * Stops the looping sound when the user releases their finger.
+     */
+    fun stopStringHoldLoop() {
+        stringHoldLoopJob?.cancel()
+        stringHoldLoopJob = null
     }
 
     fun selectString(string: InstrumentString) {
@@ -703,6 +754,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     override fun onCleared() {
         super.onCleared()
+        stopStringHoldLoop()
+        toneSynthesizer.release()
         stopListening()
         stopMetronome()
     }

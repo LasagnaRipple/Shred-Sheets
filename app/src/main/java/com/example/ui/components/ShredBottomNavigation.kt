@@ -56,10 +56,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.ui.theme.ShredBrandVolt
+import com.example.ui.theme.LocalIsDarkTheme
 import com.example.ui.theme.ShredCardBorder
 import com.example.ui.theme.ShredNavInactive
-import com.example.ui.theme.ShredPillOlive
 import com.example.viewmodel.AppTab
 import kotlinx.coroutines.launch
 
@@ -110,6 +109,9 @@ fun ShredBottomNavigation(
         label = "pillWidthAnim"
     )
 
+    val activeAccent = MaterialTheme.colorScheme.primary
+    val isDark = LocalIsDarkTheme.current
+
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -117,7 +119,7 @@ fun ShredBottomNavigation(
             .background(MaterialTheme.colorScheme.surface)
             .border(
                 1.5.dp,
-                ShredCardBorder.copy(alpha = 0.5f),
+                if (isDark) ShredCardBorder.copy(alpha = 0.5f) else MaterialTheme.colorScheme.outlineVariant,
                 RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
             )
     ) {
@@ -141,19 +143,19 @@ fun ShredBottomNavigation(
                     Canvas(modifier = Modifier.fillMaxSize()) {
                         val cornerRadPx = 14.dp.toPx()
                         drawRoundRect(
-                            color = ShredBrandVolt.copy(alpha = 0.18f),
+                            color = activeAccent.copy(alpha = 0.18f),
                             topLeft = Offset(-3.dp.toPx(), -2.dp.toPx()),
                             size = Size(size.width + 6.dp.toPx(), size.height + 4.dp.toPx()),
                             cornerRadius = CornerRadius(cornerRadPx + 2.dp.toPx())
                         )
                         drawRoundRect(
-                            color = ShredPillOlive,
+                            color = activeAccent.copy(alpha = 0.22f),
                             topLeft = Offset.Zero,
                             size = size,
                             cornerRadius = CornerRadius(cornerRadPx)
                         )
                         drawRoundRect(
-                            color = ShredBrandVolt.copy(alpha = 0.35f),
+                            color = activeAccent.copy(alpha = 0.40f),
                             topLeft = Offset.Zero,
                             size = size,
                             cornerRadius = CornerRadius(cornerRadPx),
@@ -218,8 +220,11 @@ private fun RowScope.ShredNavTabItem(
     }
 
     val animDuration = if (isReduceMotion) 0 else 280
+    val activeAccent = MaterialTheme.colorScheme.primary
+    val isDark = LocalIsDarkTheme.current
+    val inactiveColor = if (isDark) ShredNavInactive else MaterialTheme.colorScheme.onSurfaceVariant
     val labelColor by animateColorAsState(
-        targetValue = if (isSelected) ShredBrandVolt else ShredNavInactive,
+        targetValue = if (isSelected) activeAccent else inactiveColor,
         animationSpec = tween(animDuration, easing = PillSlideEasing),
         label = "navColorCrossFade"
     )

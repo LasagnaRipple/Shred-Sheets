@@ -58,12 +58,8 @@ class SettingsPreferences(context: Context) {
         val soundEnabled = prefs.getBoolean(KEY_SOUND_ENABLED, true)
         val hapticsEnabled = prefs.getBoolean(KEY_HAPTICS_ENABLED, true)
 
-        val tunerModeStr = prefs.getString(KEY_TUNER_MODE, TunerMode.AUTO.name) ?: TunerMode.AUTO.name
-        val tunerMode = try {
-            TunerMode.valueOf(tunerModeStr)
-        } catch (_: Exception) {
-            TunerMode.AUTO
-        }
+        // On first load or return, Auto detect is always initialized to ON (TunerMode.AUTO)
+        val tunerMode = TunerMode.AUTO
 
         val languageCode = prefs.getString(KEY_LANGUAGE_CODE, "en") ?: "en"
         val isOnboardingCompleted = prefs.getBoolean(KEY_ONBOARDING_COMPLETED, false)
