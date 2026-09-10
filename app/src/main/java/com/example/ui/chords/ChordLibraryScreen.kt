@@ -96,9 +96,15 @@ fun ChordLibraryScreen(
     var selectedCategory by remember { mutableStateOf("All") }
     var selectedChord by remember(allChords) { mutableStateOf(allChords.firstOrNull()) }
 
-    val categories = listOf("All", "Major", "Minor", "Power")
+    val categories = listOf("All", "Major", "Minor", "7th")
     val filteredChords = remember(allChords, selectedCategory) {
-        if (selectedCategory == "All") allChords else allChords.filter { it.category.equals(selectedCategory, ignoreCase = true) }
+        when (selectedCategory) {
+            "All" -> allChords
+            "7th" -> allChords.filter { it.category == "7th" || it.name.contains("7") }
+            "Minor" -> allChords.filter { it.category == "Minor" }
+            "Major" -> allChords.filter { it.category == "Major" }
+            else -> allChords.filter { it.category.equals(selectedCategory, ignoreCase = true) }
+        }
     }
     val haptic = LocalHapticFeedback.current
     var showKeyDialog by remember { mutableStateOf(false) }
@@ -225,55 +231,16 @@ fun ChordLibraryScreen(
                                 .weight(1f)
                                 .padding(end = 10.dp)
                         ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Text(
-                                    text = chord.name,
-                                    style = MaterialTheme.typography.titleLarge.copy(
-                                        fontWeight = FontWeight.Black,
-                                        fontSize = 24.sp
-                                    ),
-                                    color = primaryTextColor,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-
-                                // Key / Info Popup Button (i)
-                                IconButton(
-                                    onClick = {
-                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                        showKeyDialog = true
-                                    },
-                                    modifier = Modifier
-                                        .size(30.dp)
-                                        .testTag("chord_chart_key_button")
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Outlined.Info,
-                                        contentDescription = "Diagram Key",
-                                        tint = activeAccent,
-                                        modifier = Modifier.size(19.dp)
-                                    )
-                                }
-                            }
-
-                            // Difficulty subtitle giving kids a sense of progression
-                            val difficultySubtitle = when {
-                                chord.difficulty.contains("Beginner", ignoreCase = true) -> "Beginner friendly"
-                                chord.difficulty.contains("Intermediate", ignoreCase = true) -> "Intermediate level"
-                                chord.difficulty.contains("Advanced", ignoreCase = true) -> "Advanced level"
-                                chord.category.contains("Power", ignoreCase = true) -> "Power chord rock"
-                                else -> "${chord.difficulty} level"
-                            }
+                            val chordDisplayName = chord.fullName.ifEmpty { chord.name }
                             Text(
-                                text = difficultySubtitle,
-                                style = MaterialTheme.typography.bodySmall.copy(
-                                    fontWeight = FontWeight.Medium,
-                                    fontSize = 13.sp
+                                text = chordDisplayName,
+                                style = MaterialTheme.typography.titleLarge.copy(
+                                    fontWeight = FontWeight.Black,
+                                    fontSize = 22.sp
                                 ),
-                                color = mutedTextColor
+                                color = primaryTextColor,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
 
@@ -366,9 +333,9 @@ fun ChordLibraryScreen(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Grid of available chords to tap & select
+        // Grid of available chords to tap & select (4 columns matching 4x4 chart layout)
         LazyVerticalGrid(
-            columns = GridCells.Fixed(3),
+            columns = GridCells.Fixed(4),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.weight(1f)
@@ -378,7 +345,7 @@ fun ChordLibraryScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(48.dp)
+                        .height(44.dp)
                         .clip(RoundedCornerShape(12.dp))
                         .background(
                             if (isSelected) activeAccent.copy(alpha = if (isDark) 0.16f else 0.12f) else cardSurface
@@ -392,7 +359,7 @@ fun ChordLibraryScreen(
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             selectedChord = chord
                         }
-                        .padding(horizontal = 6.dp)
+                        .padding(horizontal = 4.dp)
                         .testTag("chord_item_${chord.id}"),
                     contentAlignment = Alignment.Center
                 ) {
@@ -400,7 +367,7 @@ fun ChordLibraryScreen(
                         text = chord.name,
                         style = MaterialTheme.typography.titleSmall.copy(
                             fontWeight = FontWeight.Bold,
-                            fontSize = 13.5.sp
+                            fontSize = 14.sp
                         ),
                         color = if (isSelected) activeAccent else primaryTextColor,
                         textAlign = TextAlign.Center,
@@ -637,21 +604,14 @@ fun ChordDiagramKeyDialog(
                             tint = primaryColor,
                             modifier = Modifier.size(24.dp)
                         )
-                        Column {
-                            Text(
-                                text = "Diagram key",
-                                style = MaterialTheme.typography.titleLarge.copy(
-                                    fontWeight = FontWeight.Black,
-                                    fontSize = 20.sp
-                                ),
-                                color = primaryText
-                            )
-                            Text(
-                                text = "How to read chord diagrams",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = mutedText
-                            )
-                        }
+                        Text(
+                            text = "How to read chords",
+                            style = MaterialTheme.typography.titleLarge.copy(
+                                fontWeight = FontWeight.Black,
+                                fontSize = 19.sp
+                            ),
+                            color = primaryText
+                        )
                     }
 
                     IconButton(

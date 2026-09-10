@@ -53,6 +53,7 @@ import com.example.ui.chords.ChordLibraryScreen
 import com.example.ui.components.InstrumentPickerDialog
 import com.example.ui.components.ShredBottomNavigation
 import com.example.ui.components.TuningPickerDialog
+import com.example.ui.loop.LoopStationScreen
 import com.example.ui.metronome.MetronomeScreen
 import com.example.ui.onboarding.OnboardingScreen
 import com.example.ui.settings.SettingsDialog
@@ -184,6 +185,8 @@ fun MainAppContent(
     val metronomePlaying by viewModel.metronomePlaying.collectAsState()
     val currentBeat by viewModel.metronomeCurrentBeat.collectAsState()
     val timeSignature by viewModel.metronomeTimeSignature.collectAsState()
+    val soundMode by viewModel.metronomeSoundMode.collectAsState()
+    val drumStyle by viewModel.drumStyle.collectAsState()
 
     // Dialog states
     val showInstrumentPicker by viewModel.showInstrumentPicker.collectAsState()
@@ -288,10 +291,21 @@ fun MainAppContent(
                                 isPlaying = metronomePlaying,
                                 currentBeat = currentBeat,
                                 timeSignatureBeats = timeSignature,
+                                soundMode = soundMode,
+                                drumStyle = drumStyle,
                                 onBpmChange = { viewModel.setMetronomeBpm(it) },
                                 onTogglePlay = { viewModel.toggleMetronome() },
                                 onTapTempo = { viewModel.tapTempo() },
                                 onTimeSignatureChange = { viewModel.setMetronomeTimeSignature(it) },
+                                onSoundModeChange = { viewModel.setMetronomeSoundMode(it) },
+                                onDrumStyleChange = { viewModel.setDrumStyle(it) },
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+
+                        AppTab.LOOP -> {
+                            LoopStationScreen(
+                                viewModel = viewModel,
                                 modifier = Modifier.fillMaxSize()
                             )
                         }

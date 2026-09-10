@@ -7,15 +7,21 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 import android.view.HapticFeedbackConstants
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,6 +33,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -63,6 +70,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.model.DrumStyle
+import com.example.model.MetronomeSoundMode
 import com.example.ui.theme.LocalIsDarkTheme
 import com.example.ui.theme.VibrantDarkBorder
 import com.example.ui.theme.VibrantDarkCard
@@ -88,6 +97,10 @@ fun MetronomeScreen(
     onTogglePlay: () -> Unit,
     onTapTempo: () -> Unit,
     onTimeSignatureChange: (Int) -> Unit,
+    soundMode: MetronomeSoundMode = MetronomeSoundMode.CLICK,
+    drumStyle: DrumStyle = DrumStyle.ROCK,
+    onSoundModeChange: (MetronomeSoundMode) -> Unit = {},
+    onDrumStyleChange: (DrumStyle) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val haptic = LocalHapticFeedback.current
@@ -265,7 +278,76 @@ fun MetronomeScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // Sound Mode Toggle (Click / Drums) & Drum Style Chips
+        val chipSurface = if (isDark) Color(0xFF1E293B) else MaterialTheme.colorScheme.surfaceVariant
+        val chipBorderColor = if (isDark) Color(0xFF334155) else MaterialTheme.colorScheme.outlineVariant
+
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(horizontal = 8.dp)
+        ) {
+            // Segmented Control: Click / Drums (compact size matching Loop screen)
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(chipSurface)
+                    .border(1.5.dp, chipBorderColor, RoundedCornerShape(999.dp))
+                    .padding(2.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Click option
+                val isClick = soundMode == MetronomeSoundMode.CLICK
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(if (isClick) activeAccentColor else Color.Transparent)
+                        .clickable {
+                            triggerStrongTick()
+                            onSoundModeChange(MetronomeSoundMode.CLICK)
+                        }
+                        .padding(horizontal = 14.dp, vertical = 6.dp)
+                        .testTag("sound_mode_click"),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "Click",
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontWeight = if (isClick) FontWeight.Bold else FontWeight.Medium,
+                            fontSize = 12.sp
+                        ),
+                        color = if (isClick) MaterialTheme.colorScheme.onPrimary else if (isDark) Color(0xFF94A3B8) else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                // Drums option (Rock drums)
+                val isDrums = soundMode == MetronomeSoundMode.DRUMS
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(if (isDrums) activeAccentColor else Color.Transparent)
+                        .clickable {
+                            triggerStrongTick()
+                            onSoundModeChange(MetronomeSoundMode.DRUMS)
+                        }
+                        .padding(horizontal = 14.dp, vertical = 6.dp)
+                        .testTag("sound_mode_drums"),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "Drums",
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontWeight = if (isDrums) FontWeight.Bold else FontWeight.Medium,
+                            fontSize = 12.sp
+                        ),
+                        color = if (isDrums) MaterialTheme.colorScheme.onPrimary else if (isDark) Color(0xFF94A3B8) else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
 
         // Center Jog Wheel Dial with Play/Pause and Tap Tempo Center Pod
         val dialSize = 285.dp
@@ -463,7 +545,7 @@ fun MetronomeScreen(
                             .background(if (isDark) Color(0xFF2E333D) else MaterialTheme.colorScheme.outlineVariant)
                     )
 
-                    // Bottom Half: Tap Tempo Button (standalone finger tap emoji)
+                    // Bottom Half: Tap Tempo Button (labeled 'Tap')
                     Box(
                         modifier = Modifier
                             .weight(1f)
@@ -476,8 +558,12 @@ fun MetronomeScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "👆",
-                            fontSize = 30.sp
+                            text = "Tap",
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 18.sp
+                            ),
+                            color = if (isDark) Color(0xFFCBD5E1) else MaterialTheme.colorScheme.onSurface
                         )
                     }
                 }
@@ -647,7 +733,7 @@ fun MetronomeScreen(
             containerColor = if (isDark) VibrantDarkSurface else MaterialTheme.colorScheme.surface,
             title = {
                 Text(
-                    text = "Tempo Markings ⏱️",
+                    text = "Tempo Markings",
                     color = if (isDark) Color.White else MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.Bold
                 )
@@ -658,14 +744,14 @@ fun MetronomeScreen(
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     val tempos = listOf(
-                        "Largo" to "40 - 60 BPM (Slow & broad)",
-                        "Adagio" to "66 - 76 BPM (Slow & stately)",
-                        "Andante" to "76 - 108 BPM (Walking pace)",
-                        "Moderato" to "108 - 120 BPM (Moderate)",
-                        "Allegro" to "120 - 156 BPM (Fast & bright)",
-                        "Presto" to "168 - 200 BPM (Very fast)"
+                        Triple("Largo", "40 - 60 BPM (Slow & broad)", (40 + 60) / 2),
+                        Triple("Adagio", "66 - 76 BPM (Slow & stately)", (66 + 76) / 2),
+                        Triple("Andante", "76 - 108 BPM (Walking pace)", (76 + 108) / 2),
+                        Triple("Moderato", "108 - 120 BPM (Moderate)", (108 + 120) / 2),
+                        Triple("Allegro", "120 - 156 BPM (Fast & bright)", (120 + 156) / 2),
+                        Triple("Presto", "168 - 200 BPM (Very fast)", (168 + 200) / 2)
                     )
-                    tempos.forEach { (name, desc) ->
+                    tempos.forEach { (name, desc, avgBpm) ->
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -674,6 +760,11 @@ fun MetronomeScreen(
                                 .then(
                                     if (!isDark) Modifier.border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp)) else Modifier
                                 )
+                                .clickable {
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    onBpmChange(avgBpm)
+                                    showTempoInfoDialog = false
+                                }
                                 .padding(horizontal = 12.dp, vertical = 8.dp)
                         ) {
                             Text(

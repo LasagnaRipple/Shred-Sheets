@@ -26,15 +26,38 @@ class ToneSynthesizer {
         private const val CHUNK_SIZE = 256 // ~5.8ms per chunk for ultra-low latency response
     }
 
-    private val voices = CopyOnWriteArrayList<Voice>()
+    private interface SoundVoice {
+        fun nextSample(): Double
+        fun isFinished(): Boolean
+        fun triggerFadeOut(fadeSamples: Int = 800) {}
+        val isPercussiveVoice: Boolean get() = false
+    }
+
+    private val voices = CopyOnWriteArrayList<SoundVoice>()
     private val synthScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     private var synthJob: Job? = null
     private val lock = Any()
 
+    // Pre-computed one-shot PCM samples for zero-latency, CC0 drum playback
+    private val kickSamples by lazy { DrumAudioGenerator.generateHitSamples(com.example.model.DrumHit.KICK) }
+    private val snareSamples by lazy { DrumAudioGenerator.generateHitSamples(com.example.model.DrumHit.SNARE) }
+    private val closedHatSamples by lazy { DrumAudioGenerator.generateHitSamples(com.example.model.DrumHit.CLOSED_HIHAT) }
+    private val openHatSamples by lazy { DrumAudioGenerator.generateHitSamples(com.example.model.DrumHit.OPEN_HIHAT) }
+    private val rimClickSamples by lazy { DrumAudioGenerator.generateHitSamples(com.example.model.DrumHit.RIM_CLICK) }
+
     /**
-     * Pre-warms the low-latency audio track so tapping a string responds instantaneously with 0 startup lag.
+     * Pre-warms the low-latency audio track and pre-loads drum PCM samples
+     * so metronome drums and string taps fire instantaneously with 0 startup delay.
      */
     fun warmUp() {
+        // Pre-initialize lazy drum samples in background pool
+        synthScope.launch {
+            kickSamples
+            snareSamples
+            closedHatSamples
+            openHatSamples
+            rimClickSamples
+        }
         ensureAudioLoopRunning()
     }
 
@@ -48,18 +71,38 @@ class ToneSynthesizer {
         }
     }
 
+    private class SampleVoice(
+        val samples: ShortArray,
+        val volume: Float
+    ) : SoundVoice {
+        var sampleIndex: Int = 0
+
+        override val isPercussiveVoice: Boolean get() = true
+
+        override fun isFinished(): Boolean = sampleIndex >= samples.size
+
+        override fun nextSample(): Double {
+            if (isFinished()) return 0.0
+            val s = (samples[sampleIndex].toDouble() / 32768.0) * volume
+            sampleIndex++
+            return s
+        }
+    }
+
     private class Voice(
         val frequency: Double,
         val maxDurationSamples: Int,
         val volume: Float,
         val isPercussive: Boolean = false
-    ) {
+    ) : SoundVoice {
         var sampleIndex: Int = 0
         var isFadingOut: Boolean = false
         var fadeOutRemaining: Int = 0
         var fadeOutStartRemaining: Int = 0
 
-        fun triggerFadeOut(fadeSamples: Int = 800) {
+        override val isPercussiveVoice: Boolean get() = isPercussive
+
+        override fun triggerFadeOut(fadeSamples: Int) {
             if (!isFadingOut || fadeOutRemaining > fadeSamples) {
                 isFadingOut = true
                 fadeOutRemaining = fadeSamples
@@ -67,11 +110,11 @@ class ToneSynthesizer {
             }
         }
 
-        fun isFinished(): Boolean {
+        override fun isFinished(): Boolean {
             return sampleIndex >= maxDurationSamples || (isFadingOut && fadeOutRemaining <= 0)
         }
 
-        fun nextSample(): Double {
+        override fun nextSample(): Double {
             if (isFinished()) return 0.0
 
             val t = sampleIndex.toDouble() / SAMPLE_RATE
@@ -178,9 +221,15 @@ class ToneSynthesizer {
                             for (j in 0 until activeList.size) {
                                 sum += activeList[j].nextSample()
                             }
-                            // Tanh soft limiter prevents any clipping even with multiple notes/taps
-                            val limited = tanh(sum * 0.60)
-                            chunk[i] = (limited * 25000.0).toInt().coerceIn(
+                            // Smooth transparent limiter: perfectly linear up to ±0.80, gentle tanh knee above to eliminate digital clipping
+                            val limited = if (kotlin.math.abs(sum) <= 0.80) {
+                                sum
+                            } else {
+                                val sign = if (sum > 0) 1.0 else -1.0
+                                val excess = kotlin.math.abs(sum) - 0.80
+                                sign * (0.80 + 0.18 * tanh(excess / 0.18))
+                            }
+                            chunk[i] = (limited * 32000.0).toInt().coerceIn(
                                 Short.MIN_VALUE.toInt(),
                                 Short.MAX_VALUE.toInt()
                             ).toShort()
@@ -219,7 +268,7 @@ class ToneSynthesizer {
 
         // Smoothly dampen previous plucks over 18ms (800 samples) to prevent popping
         for (v in voices) {
-            if (!v.isPercussive) {
+            if (!v.isPercussiveVoice) {
                 v.triggerFadeOut(800)
             }
         }
@@ -290,7 +339,7 @@ class ToneSynthesizer {
         synthScope.launch {
             // Dampen prior chord voices smoothly
             for (v in voices) {
-                if (!v.isPercussive) {
+                if (!v.isPercussiveVoice) {
                     v.triggerFadeOut(1200)
                 }
             }
@@ -323,6 +372,39 @@ class ToneSynthesizer {
             isPercussive = true
         )
         voices.add(voice)
+        ensureAudioLoopRunning()
+    }
+
+    /**
+     * Plays a single one-shot drum hit (Kick, Snare, Closed/Open HiHat, Rim Click).
+     */
+    fun playDrumHit(hit: com.example.model.DrumHit, volume: Float = 0.85f) {
+        val buf = when (hit) {
+            com.example.model.DrumHit.KICK -> kickSamples
+            com.example.model.DrumHit.SNARE -> snareSamples
+            com.example.model.DrumHit.CLOSED_HIHAT -> closedHatSamples
+            com.example.model.DrumHit.OPEN_HIHAT -> openHatSamples
+            com.example.model.DrumHit.RIM_CLICK -> rimClickSamples
+        }
+        voices.add(SampleVoice(buf, volume))
+        ensureAudioLoopRunning()
+    }
+
+    /**
+     * Fires multiple drum hits simultaneously (e.g. Kick + Hi-Hat on beat 1).
+     */
+    fun playDrumHits(hits: List<com.example.model.DrumHit>, volume: Float = 0.85f) {
+        if (hits.isEmpty()) return
+        for (hit in hits) {
+            val buf = when (hit) {
+                com.example.model.DrumHit.KICK -> kickSamples
+                com.example.model.DrumHit.SNARE -> snareSamples
+                com.example.model.DrumHit.CLOSED_HIHAT -> closedHatSamples
+                com.example.model.DrumHit.OPEN_HIHAT -> openHatSamples
+                com.example.model.DrumHit.RIM_CLICK -> rimClickSamples
+            }
+            voices.add(SampleVoice(buf, volume))
+        }
         ensureAudioLoopRunning()
     }
 }

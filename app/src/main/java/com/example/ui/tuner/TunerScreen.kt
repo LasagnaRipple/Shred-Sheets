@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -152,13 +153,13 @@ fun TunerScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
         // Center Attraction: Circular Tuning Component per Redesign Spec
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(190.dp)
+                .wrapContentHeight()
                 .padding(horizontal = 16.dp),
             contentAlignment = Alignment.Center
         ) {
@@ -166,7 +167,7 @@ fun TunerScreen(
                 pitchResult = pitchResult,
                 hasSignal = hasSignal,
                 primaryColor = MaterialTheme.colorScheme.primary,
-                accentColor = MaterialTheme.colorScheme.secondary,
+                accentColor = MaterialTheme.colorScheme.primary,
                 isTunerActive = isTunerActive,
                 isAllStringsTuned = isAllStringsTuned,
                 isStringConfirmed = isStringConfirmed,

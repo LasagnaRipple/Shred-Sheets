@@ -12,8 +12,11 @@ import com.example.model.AccentColor
 import com.example.model.AppSettings
 import com.example.model.AppStyleTheme
 import com.example.model.ColorMode
+import com.example.model.DrumStyle
 import com.example.model.InstrumentType
+import com.example.model.MetronomeSoundMode
 import com.example.model.PitchResult
+import com.example.model.RecordingState
 import com.example.ui.theme.ShredSheetsTheme
 import com.example.viewmodel.AppTab
 import com.example.viewmodel.MainViewModel
@@ -250,5 +253,112 @@ class FullAppE2ETest {
         val reloaded = SettingsPreferences(application).loadSettings()
         assertEquals(AccentColor.GREEN, reloaded.accentColor)
         assertEquals(ColorMode.LIGHT, reloaded.colorMode)
+    }
+
+    @Test
+    fun e2e_metronome_drumPlaybackAndStyleSelection() {
+        viewModel.selectTab(AppTab.METRONOME)
+
+        composeTestRule.setContent {
+            val settings = viewModel.settings.value
+            ShredSheetsTheme(
+                accentColor = settings.accentColor,
+                colorMode = settings.colorMode
+            ) {
+                MainAppContent(
+                    viewModel = viewModel,
+                    onRequestPermission = {}
+                )
+            }
+        }
+
+        composeTestRule.waitForIdle()
+
+        // 1. Check default is Click mode
+        assertEquals(MetronomeSoundMode.CLICK, viewModel.metronomeSoundMode.value)
+        composeTestRule.onNodeWithTag("sound_mode_click").assertExists()
+        composeTestRule.onNodeWithTag("sound_mode_drums").assertExists()
+
+        // 2. Switch to Drums mode
+        composeTestRule.onNodeWithTag("sound_mode_drums").performClick()
+        composeTestRule.waitForIdle()
+        assertEquals(MetronomeSoundMode.DRUMS, viewModel.metronomeSoundMode.value)
+        assertEquals(DrumStyle.ROCK, viewModel.drumStyle.value)
+
+        // Switch back to Click mode
+        composeTestRule.onNodeWithTag("sound_mode_click").performClick()
+        composeTestRule.waitForIdle()
+        assertEquals(MetronomeSoundMode.CLICK, viewModel.metronomeSoundMode.value)
+    }
+
+    @Test
+    fun e2e_loopStation_navigationAndControls() {
+        viewModel.selectTab(AppTab.LOOP)
+
+        composeTestRule.setContent {
+            val settings = viewModel.settings.value
+            ShredSheetsTheme(
+                accentColor = settings.accentColor,
+                colorMode = settings.colorMode
+            ) {
+                MainAppContent(
+                    viewModel = viewModel,
+                    onRequestPermission = {}
+                )
+            }
+        }
+
+        composeTestRule.waitForIdle()
+
+        // Verify Loop Station controls exist
+        composeTestRule.onNodeWithTag("loop_backing_play_button").assertExists()
+        composeTestRule.onNodeWithTag("loop_sound_mode_click").assertExists()
+        composeTestRule.onNodeWithTag("loop_sound_mode_drums").assertExists()
+        composeTestRule.onNodeWithTag("loop_backing_volume_button").assertExists().performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("loop_backing_volume_slider").assertExists()
+        // Tapping the volume button again hides the slider
+        composeTestRule.onNodeWithTag("loop_backing_volume_button").performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("loop_backing_volume_slider").assertDoesNotExist()
+        composeTestRule.onNodeWithTag("loop_length_slider").assertDoesNotExist()
+        composeTestRule.onNodeWithTag("loop_bpm_decrement_button").assertExists()
+        composeTestRule.onNodeWithTag("loop_bpm_increment_button").assertExists()
+        composeTestRule.onNodeWithTag("loop_tap_tempo_button").assertDoesNotExist()
+        composeTestRule.onNodeWithTag("loop_bpm_slider").assertExists()
+        composeTestRule.onNodeWithTag("track_pad_1").assertExists()
+        composeTestRule.onNodeWithTag("track_pad_2").assertExists()
+        composeTestRule.onNodeWithTag("track_pad_3").assertDoesNotExist()
+        composeTestRule.onNodeWithTag("track_1_speaker_button").assertExists()
+        composeTestRule.onNodeWithTag("track_2_speaker_button").assertExists()
+        composeTestRule.onNodeWithTag("track_3_speaker_button").assertDoesNotExist()
+        composeTestRule.onNodeWithTag("export_mix_save_button").assertExists()
+        composeTestRule.onNodeWithTag("export_mix_share_button").assertExists()
+
+        // Test tempo adjustment from Loop Station
+        val initialBpm = viewModel.metronomeBpm.value
+        composeTestRule.onNodeWithTag("loop_bpm_increment_button").performClick()
+        composeTestRule.waitForIdle()
+        assertEquals(initialBpm + 1, viewModel.metronomeBpm.value)
+
+        composeTestRule.onNodeWithTag("loop_bpm_decrement_button").performClick()
+        composeTestRule.waitForIdle()
+        assertEquals(initialBpm, viewModel.metronomeBpm.value)
+
+        // Toggle backing playback from Loop Station
+        assertFalse(viewModel.metronomePlaying.value)
+        composeTestRule.onNodeWithTag("loop_backing_play_button").performClick()
+        composeTestRule.waitForIdle()
+        assertTrue(viewModel.metronomePlaying.value)
+
+        // Arm Track 1 by tapping Track Pad 1
+        composeTestRule.onNodeWithTag("track_pad_1").performClick()
+        composeTestRule.waitForIdle()
+        assertEquals(0, viewModel.loopStationEngine.armedTrackIndex.value)
+
+        // Stop backing
+        composeTestRule.onNodeWithTag("loop_backing_play_button").performClick()
+        composeTestRule.waitForIdle()
+        assertFalse(viewModel.metronomePlaying.value)
     }
 }

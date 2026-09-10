@@ -18,6 +18,7 @@ import com.example.model.InstrumentType
 import com.example.model.MusicalPitchHelper
 import com.example.model.PitchResult
 import com.example.model.TuningMode
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,10 +28,11 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlin.random.Random
 
-enum class AppTab(val title: String, val icon: String) {
-    TUNER("Tuner", "⚡"),
-    CHORDS("Chords", "🎸"),
-    METRONOME("Metronome", "⏱️")
+enum class AppTab(val title: String, val icon: String = "") {
+    TUNER("TUNER", ""),
+    CHORDS("CHORDS", ""),
+    METRONOME("CLICK", ""),
+    LOOP("LOOPS", "")
 }
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
@@ -40,6 +42,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val pitchDetector = PitchDetector()
     val toneSynthesizer = ToneSynthesizer()
     val hapticManager = HapticFeedbackManager(application)
+    val loopStationEngine = com.example.audio.LoopStationEngine(application)
 
     // App Settings loaded from persistent storage (Auto detect default ON on load/return)
     private val _settings = MutableStateFlow(
@@ -89,7 +92,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _metronomeTimeSignature = MutableStateFlow(4)
     val metronomeTimeSignature: StateFlow<Int> = _metronomeTimeSignature.asStateFlow()
 
+    // Metronome Sound Mode: CLICK vs DRUMS (defaults to CLICK)
+    private val _metronomeSoundMode = MutableStateFlow(com.example.model.MetronomeSoundMode.CLICK)
+    val metronomeSoundMode: StateFlow<com.example.model.MetronomeSoundMode> = _metronomeSoundMode.asStateFlow()
+
+    // Drum Style: ROCK, POP, FOLK, LATIN, SHUFFLE (defaults to ROCK)
+    private val _drumStyle = MutableStateFlow(com.example.model.DrumStyle.ROCK)
+    val drumStyle: StateFlow<com.example.model.DrumStyle> = _drumStyle.asStateFlow()
+
     private var metronomeJob: Job? = null
+    private var loopProgressJob: Job? = null
 
     // Tap tempo timestamps
     private val tapTimestamps = mutableListOf<Long>()
@@ -152,8 +164,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val allStrings = getCurrentTuning().strings
 
                 if (result.frequency > 20.0 && result.confidence > 0.45) {
-                    // String strike haptic feedback
-                    if (_settings.value.hapticsEnabled) {
+                    // String strike haptic feedback (disabled when drum loop / click track is playing back)
+                    if (_settings.value.hapticsEnabled && !_metronomePlaying.value) {
                         hapticManager.performStringPluckFeedback()
                     }
 
@@ -257,8 +269,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         dwellJob = null
         dwellCandidateStringNumber = null
 
-        // 1. Distinct lock-in double-pulse haptic
-        if (_settings.value.hapticsEnabled) {
+        // 1. Distinct lock-in double-pulse haptic (disabled when drum loop / click track is playing back)
+        if (_settings.value.hapticsEnabled && !_metronomePlaying.value) {
             hapticManager.performConfirmationLockedFeedback()
         }
 
@@ -660,12 +672,26 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     // Metronome Operations
     fun setMetronomeBpm(bpm: Int) {
-        _metronomeBpm.value = bpm.coerceIn(30, 240)
+        val clamped = bpm.coerceIn(30, 240)
+        _metronomeBpm.value = clamped
+        loopStationEngine.syncLoopDuration(clamped, _metronomeTimeSignature.value)
     }
 
     fun setMetronomeTimeSignature(beats: Int) {
         _metronomeTimeSignature.value = beats
         _metronomeCurrentBeat.value = 1
+        loopStationEngine.syncLoopDuration(_metronomeBpm.value, beats)
+    }
+
+    fun setMetronomeSoundMode(mode: com.example.model.MetronomeSoundMode) {
+        _metronomeSoundMode.value = mode
+        if (mode == com.example.model.MetronomeSoundMode.DRUMS) {
+            _drumStyle.value = com.example.model.DrumStyle.ROCK
+        }
+    }
+
+    fun setDrumStyle(style: com.example.model.DrumStyle) {
+        _drumStyle.value = style
     }
 
     fun toggleMetronome() {
@@ -676,38 +702,161 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private fun startMetronome() {
+    fun startMetronome() {
+        if (_metronomePlaying.value) return
         _metronomePlaying.value = true
         _metronomeCurrentBeat.value = 1
 
         metronomeJob?.cancel()
-        metronomeJob = viewModelScope.launch {
+        metronomeJob = viewModelScope.launch(Dispatchers.Default) {
+            var beatCounter = 0
+            var nextBeatNano = System.nanoTime()
             while (isActive && _metronomePlaying.value) {
                 val bpm = _metronomeBpm.value
-                val intervalMs = (60_000L / bpm).coerceAtLeast(100L)
+                val intervalNanos = (60_000_000_000L / bpm).coerceAtLeast(100_000_000L)
                 val current = _metronomeCurrentBeat.value
                 val isAccent = current == 1
 
                 if (_settings.value.soundEffectsEnabled) {
-                    toneSynthesizer.playMetronomeTick(isAccent)
+                    if (_metronomeSoundMode.value == com.example.model.MetronomeSoundMode.CLICK) {
+                        toneSynthesizer.playMetronomeTick(isAccent)
+                    } else {
+                        val hits = com.example.model.DrumPatternEngine.getHitsForBeat(
+                            style = com.example.model.DrumStyle.ROCK,
+                            timeSignatureBeats = _metronomeTimeSignature.value,
+                            beat = current
+                        )
+                        toneSynthesizer.playDrumHits(hits)
+                    }
                 }
-                if (_settings.value.hapticsEnabled) {
-                    hapticManager.performMetronomeBeat(isAccent)
-                }
+                // Haptic feedback is disabled when drum loop / click track is playing back to the user
 
-                delay(intervalMs)
+                val timeSignature = _metronomeTimeSignature.value
+                val barIndex = (beatCounter / timeSignature) % com.example.audio.LoopStationEngine.FIXED_LOOP_BARS
+                val isLoopStart = (barIndex == 0 && current == 1)
 
+                // Notify LoopStationEngine for quantized record starts and bar position
+                loopStationEngine.onBackingBeatFired(current, barIndex, isLoopStart, bpm, timeSignature)
+
+                beatCounter++
                 val beats = _metronomeTimeSignature.value
                 val nextBeat = if (current >= beats) 1 else current + 1
                 _metronomeCurrentBeat.value = nextBeat
+
+                // Drift-free scheduling: compute exact next target timestamp
+                nextBeatNano += intervalNanos
+                val sleepNano = nextBeatNano - System.nanoTime()
+                if (sleepNano > 1_000_000L) {
+                    delay(sleepNano / 1_000_000L)
+                } else if (sleepNano < -intervalNanos) {
+                    // If fell severely behind (e.g. system pause), re-sync base
+                    nextBeatNano = System.nanoTime()
+                }
             }
         }
+
+        loopProgressJob?.cancel()
+        loopProgressJob = viewModelScope.launch {
+            val startTime = System.currentTimeMillis()
+            while (isActive && _metronomePlaying.value) {
+                val elapsedSec = (System.currentTimeMillis() - startTime) / 1000f
+                loopStationEngine.updateLoopPosition(
+                    elapsedSec,
+                    _metronomeBpm.value,
+                    _metronomeTimeSignature.value
+                )
+                delay(20)
+            }
+        }
+
+        loopStationEngine.startRealtimeLoopMixer()
     }
 
-    private fun stopMetronome() {
+    fun stopMetronome() {
         _metronomePlaying.value = false
         metronomeJob?.cancel()
         metronomeJob = null
+        loopProgressJob?.cancel()
+        loopProgressJob = null
+        loopStationEngine.stopRealtimeLoopMixer()
+        loopStationEngine.stopRecording()
+    }
+
+    // Loop Station Operations
+    fun onTrackPadClicked(trackIndex: Int) {
+        loopStationEngine.onTrackPadClicked(
+            trackIndex = trackIndex,
+            bpm = _metronomeBpm.value,
+            timeSignature = _metronomeTimeSignature.value,
+            isBackingPlaying = _metronomePlaying.value,
+            onEnsureBackingStarted = { startMetronome() }
+        )
+    }
+
+    fun setLoopLengthSeconds(seconds: Float) {
+        val snapped = loopStationEngine.calculateSnappedDuration(
+            rawSeconds = seconds,
+            bpm = _metronomeBpm.value,
+            timeSignature = _metronomeTimeSignature.value
+        )
+        loopStationEngine.setLoopLengthSeconds(snapped)
+    }
+
+    fun toggleTrackPlayback(trackIndex: Int) {
+        loopStationEngine.toggleTrackPlayback(trackIndex)
+    }
+
+    fun setTrackPlayback(trackIndex: Int, enabled: Boolean) {
+        loopStationEngine.setTrackPlayback(trackIndex, enabled)
+    }
+
+    fun setBackingVolume(vol: Float) {
+        loopStationEngine.setBackingVolume(vol)
+    }
+
+    fun setTrackVolume(trackIndex: Int, vol: Float) {
+        loopStationEngine.setTrackVolume(trackIndex, vol)
+    }
+
+    fun cycleTake(trackIndex: Int, direction: Int) {
+        loopStationEngine.cycleTake(trackIndex, direction)
+    }
+
+    fun setActiveTake(trackIndex: Int, takeId: String) {
+        loopStationEngine.setActiveTake(trackIndex, takeId)
+    }
+
+    fun updateTakeName(trackIndex: Int, takeId: String, newName: String) {
+        loopStationEngine.updateTakeName(trackIndex, takeId, newName)
+    }
+
+    fun updateTakeNotes(trackIndex: Int, takeId: String, notes: String) {
+        loopStationEngine.updateTakeNotes(trackIndex, takeId, notes)
+    }
+
+    fun deleteTake(trackIndex: Int, takeId: String) {
+        loopStationEngine.deleteTake(trackIndex, takeId)
+    }
+
+    fun previewTake(take: com.example.model.LoopTake) {
+        loopStationEngine.previewTake(take)
+    }
+
+    fun dismissHeadphoneTip() {
+        loopStationEngine.dismissHeadphoneTip()
+    }
+
+    fun clearAllTakes() {
+        loopStationEngine.clearAllTakes()
+    }
+
+    suspend fun bounceMix(): java.io.File {
+        return loopStationEngine.bounceMix(
+            isDrums = _metronomeSoundMode.value == com.example.model.MetronomeSoundMode.DRUMS,
+            drumStyle = _drumStyle.value,
+            bpm = _metronomeBpm.value,
+            timeSignature = _metronomeTimeSignature.value
+        )
     }
 
     fun tapTempo() {
@@ -756,6 +905,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         super.onCleared()
         stopStringHoldLoop()
         toneSynthesizer.release()
+        loopStationEngine.release()
         stopListening()
         stopMetronome()
     }

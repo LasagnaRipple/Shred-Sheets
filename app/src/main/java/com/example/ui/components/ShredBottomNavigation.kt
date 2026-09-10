@@ -199,26 +199,6 @@ private fun RowScope.ShredNavTabItem(
     onBoundsCalculated: (Float, Float) -> Unit,
     onClick: () -> Unit
 ) {
-    val coroutineScope = rememberCoroutineScope()
-    val iconScale = remember { Animatable(1.0f) }
-
-    LaunchedEffect(isSelected) {
-        if (isSelected && !isReduceMotion) {
-            launch {
-                iconScale.animateTo(
-                    targetValue = 1.15f,
-                    animationSpec = tween(100, easing = FastOutSlowInEasing)
-                )
-                iconScale.animateTo(
-                    targetValue = 1.0f,
-                    animationSpec = tween(100, easing = FastOutSlowInEasing)
-                )
-            }
-        } else {
-            iconScale.snapTo(1.0f)
-        }
-    }
-
     val animDuration = if (isReduceMotion) 0 else 280
     val activeAccent = MaterialTheme.colorScheme.primary
     val isDark = LocalIsDarkTheme.current
@@ -242,7 +222,7 @@ private fun RowScope.ShredNavTabItem(
             .testTag("nav_tab_${tab.name.lowercase()}"),
         contentAlignment = Alignment.Center
     ) {
-        Row(
+        Box(
             modifier = Modifier
                 .onGloballyPositioned { coordinates ->
                     val parent = coordinates.parentLayoutCoordinates
@@ -255,24 +235,18 @@ private fun RowScope.ShredNavTabItem(
                         onBoundsCalculated(pos.x, coordinates.size.width.toFloat())
                     }
                 }
-                .padding(horizontal = 9.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(horizontal = 14.dp, vertical = 8.dp),
+            contentAlignment = Alignment.Center
         ) {
-            Text(
-                text = tab.icon,
-                fontSize = 17.sp,
-                modifier = Modifier.scale(iconScale.value)
-            )
-            Spacer(modifier = Modifier.width(4.dp))
             Text(
                 text = tab.title,
                 maxLines = 1,
                 softWrap = false,
-                overflow = TextOverflow.Ellipsis,
+                overflow = TextOverflow.Clip,
                 style = MaterialTheme.typography.labelLarge.copy(
-                    fontWeight = if (isSelected) FontWeight.Black else FontWeight.SemiBold,
+                    fontWeight = if (isSelected) FontWeight.Black else FontWeight.Bold,
                     fontSize = 12.sp,
-                    letterSpacing = 0.sp
+                    letterSpacing = 0.5.sp
                 ),
                 color = labelColor
             )

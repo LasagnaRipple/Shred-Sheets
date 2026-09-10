@@ -293,38 +293,59 @@ fun ShakaVisualizer(
         verticalArrangement = Arrangement.Center,
         modifier = modifier
     ) {
-        // Outer Circle (124dp fixed size, 2dp stroke, #151A12 subtle dark fill)
+        // Outer Circle container with accent glow behind
+        val outerBoxSize = 190.dp
+        val circleDiameter = 124.dp
         Box(
             modifier = Modifier
-                .size(124.dp)
-                .scale(effectiveCircleScale)
-                .pointerInput(Unit) {
-                    detectTapGestures {
-                        if (isAllStringsTuned) {
-                            onResetTuning()
-                        } else {
-                            onTap()
-                        }
-                    }
-                }
+                .size(outerBoxSize)
                 .testTag("shaka_visualizer_canvas"),
             contentAlignment = Alignment.Center
         ) {
-            // Subtle celebratory glow when perfect or confirmed
-            if (debouncedState == CircleTunerState.PERFECT || confirmedFlashAlpha.value > 0.01f) {
+            // Subtle glow behind pulsating tuner 'play circle' in user selected accent color (matching chord page finger glow)
+            val glowColor = accentColor
+            if (debouncedState == CircleTunerState.READY) {
+                Canvas(modifier = Modifier.size(outerBoxSize)) {
+                    val innerRadius = (circleDiameter.toPx() / 2f) * effectiveCircleScale
+                    val glowSpread = 30.dp.toPx() * idlePulseScale
+                    val outerRadius = innerRadius + glowSpread
+
+                    // Radial glow extending outward from behind the play circle
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                glowColor.copy(alpha = 0.55f),
+                                glowColor.copy(alpha = 0.28f),
+                                glowColor.copy(alpha = 0.08f),
+                                Color.Transparent
+                            ),
+                            center = center,
+                            radius = outerRadius
+                        ),
+                        radius = outerRadius,
+                        center = center
+                    )
+                }
+            } else if (debouncedState == CircleTunerState.PERFECT || confirmedFlashAlpha.value > 0.01f) {
                 val glowBaseColor = if (isDark) Color(0xFFC8FF3D) else Color(0xFF16A34A)
-                Canvas(modifier = Modifier.size(154.dp)) {
-                    val glowAlpha = (0.28f * successPulseScale + 0.45f * confirmedFlashAlpha.value).coerceAtMost(1f)
+                Canvas(modifier = Modifier.size(outerBoxSize)) {
+                    val innerRadius = (circleDiameter.toPx() / 2f) * effectiveCircleScale
+                    val glowSpread = 28.dp.toPx() * successPulseScale
+                    val outerRadius = innerRadius + glowSpread
+                    val glowAlpha = (0.50f * successPulseScale + 0.45f * confirmedFlashAlpha.value).coerceAtMost(1f)
+
                     drawCircle(
                         brush = Brush.radialGradient(
                             colors = listOf(
                                 glowBaseColor.copy(alpha = glowAlpha),
-                                glowBaseColor.copy(alpha = 0.08f),
+                                glowBaseColor.copy(alpha = glowAlpha * 0.45f),
                                 Color.Transparent
                             ),
                             center = center,
-                            radius = size.width / 2f
-                        )
+                            radius = outerRadius
+                        ),
+                        radius = outerRadius,
+                        center = center
                     )
                 }
             }
@@ -332,10 +353,20 @@ fun ShakaVisualizer(
             // Circle Container with 2dp border
             Box(
                 modifier = Modifier
-                    .size(124.dp)
+                    .size(circleDiameter)
+                    .scale(effectiveCircleScale)
                     .clip(CircleShape)
                     .background(if (isDark) Color(0xFF151A12) else MaterialTheme.colorScheme.surface)
-                    .border(2.dp, borderColor, CircleShape),
+                    .border(2.dp, borderColor, CircleShape)
+                    .pointerInput(Unit) {
+                        detectTapGestures {
+                            if (isAllStringsTuned) {
+                                onResetTuning()
+                            } else {
+                                onTap()
+                            }
+                        }
+                    },
                 contentAlignment = Alignment.Center
             ) {
                 // Bouncing directional arrow (positioned above/below center icon)
