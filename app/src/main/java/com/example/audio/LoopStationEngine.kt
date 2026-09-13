@@ -1,11 +1,15 @@
 package com.example.audio
 
+import android.content.ContentValues
 import android.content.Context
 import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.AudioTrack
 import android.media.MediaRecorder
+import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
 import android.util.Log
 import com.example.model.DrumStyle
 import com.example.model.LoopTake
@@ -82,8 +86,8 @@ class LoopStationEngine(private val context: Context) {
     private val _currentBarIndex = MutableStateFlow(0)
     val currentBarIndex: StateFlow<Int> = _currentBarIndex.asStateFlow()
 
-    // Backing volume [0.0f..1.0f]
-    private val _backingVolume = MutableStateFlow(0.85f)
+    // Backing volume [0.0f..1.0f] - defaults to 100%
+    private val _backingVolume = MutableStateFlow(1.0f)
     val backingVolume: StateFlow<Float> = _backingVolume.asStateFlow()
 
     // Loop length in seconds (restricted strictly to 4 bars, dynamically synced with BPM and time signature)
@@ -572,67 +576,110 @@ class LoopStationEngine(private val context: Context) {
     /**
      * Bounces the entire mix (Backing + Track 1 + Track 2) into an exportable WAV file.
      * Respects each track's volume slider and backing volume slider.
+     * Saves file to device storage using user-defined track name (default: "My track #1").
      */
-    suspend fun bounceMix(
-        isDrums: Boolean,
-        drumStyle: DrumStyle,
-        bpm: Int,
-        timeSignature: Int
-    ): File {
-        val durationMs = (_loopLengthSeconds.value * 1000L).toLong()
-        val totalSamples = ((SAMPLE_RATE.toDouble() / 1000.0) * durationMs).toInt()
+     suspend fun bounceMix(
+         isDrums: Boolean,
+         drumStyle: DrumStyle,
+         bpm: Int,
+         timeSignature: Int,
+         trackName: String = "My track #1"
+     ): File {
+         val durationMs = (_loopLengthSeconds.value * 1000L).toLong()
+         val totalSamples = ((SAMPLE_RATE.toDouble() / 1000.0) * durationMs).toInt()
 
-        // 1. Render backing track
-        val backingPcm = DrumAudioGenerator.renderBackingPattern(
-            isDrums = isDrums,
-            drumStyle = drumStyle,
-            bpm = bpm,
-            timeSignature = timeSignature,
-            totalDurationMs = durationMs
-        )
+         // 1. Render backing track
+         val backingPcm = DrumAudioGenerator.renderBackingPattern(
+             isDrums = isDrums,
+             drumStyle = drumStyle,
+             bpm = bpm,
+             timeSignature = timeSignature,
+             totalDurationMs = durationMs
+         )
 
-        // 2. Read PCM for each active take with playback enabled
-        val tracksList = _tracks.value
-        val trackPcms = tracksList.map { track ->
-            val active = track.activeTake
-            if (active != null && track.isPlaybackEnabled) {
-                val f = File(active.audioFilePath)
-                if (f.exists()) readWavPcm(f) else null
-            } else null
-        }
+         // 2. Read PCM for each active take with playback enabled
+         val tracksList = _tracks.value
+         val trackPcms = tracksList.map { track ->
+             val active = track.activeTake
+             if (active != null && track.isPlaybackEnabled) {
+                 val f = File(active.audioFilePath)
+                 if (f.exists()) readWavPcm(f) else null
+             } else null
+         }
 
-        // 3. Mix all 4 channels with volumes & soft limiter
-        val mixed = ShortArray(totalSamples)
-        val bVol = _backingVolume.value
+         // 3. Mix all 4 channels with volumes & soft limiter
+         val mixed = ShortArray(totalSamples)
+         val bVol = _backingVolume.value
 
-        for (i in 0 until totalSamples) {
-            var sum = 0.0
+         for (i in 0 until totalSamples) {
+             var sum = 0.0
 
-            // Backing
-            if (i in backingPcm.indices) {
-                sum += (backingPcm[i].toDouble() / 32768.0) * bVol
-            }
+             // Backing
+             if (i in backingPcm.indices) {
+                 sum += (backingPcm[i].toDouble() / 32768.0) * bVol
+             }
 
-            // Tracks 1, 2, 3
-            for (t in 0..2) {
-                val pcm = trackPcms.getOrNull(t)
-                val vol = tracksList.getOrNull(t)?.volume ?: 1.0f
-                if (pcm != null && i in pcm.indices) {
-                    sum += (pcm[i].toDouble() / 32768.0) * vol
-                }
-            }
+             // Tracks 1, 2, 3
+             for (t in 0..2) {
+                 val pcm = trackPcms.getOrNull(t)
+                 val vol = tracksList.getOrNull(t)?.volume ?: 1.0f
+                 if (pcm != null && i in pcm.indices) {
+                     sum += (pcm[i].toDouble() / 32768.0) * vol
+                 }
+             }
 
-            // Tanh soft limiter avoids clipping
-            val limited = tanh(sum * 0.90)
-            mixed[i] = (limited * 31500.0).toInt().coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort()
-        }
+             // Tanh soft limiter avoids clipping
+             val limited = tanh(sum * 0.90)
+             mixed[i] = (limited * 31500.0).toInt().coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort()
+         }
 
-        // 4. Save to export file
-        val exportDir = File(context.cacheDir, "exported_mixes").apply { mkdirs() }
-        val exportFile = File(exportDir, "ShredSheets_Mix_${System.currentTimeMillis()}.wav")
-        DrumAudioGenerator.saveWavFile(mixed, exportFile, SAMPLE_RATE)
-        return exportFile
-    }
+         // 4. Sanitize user-defined track name and build file name
+         val sanitized = trackName.trim().replace(Regex("[\\\\/:*?\"<>|]"), "_").ifEmpty { "My track #1" }
+         val fileNameWithExt = "$sanitized.wav"
+
+         // 5. Save to export file in app cache for instant sharing
+         val exportDir = File(context.cacheDir, "exported_mixes").apply { mkdirs() }
+         val exportFile = File(exportDir, fileNameWithExt)
+         DrumAudioGenerator.saveWavFile(mixed, exportFile, SAMPLE_RATE)
+
+         // 6. Save as audio file on user's device external music directory
+         try {
+             val musicDir = context.getExternalFilesDir(Environment.DIRECTORY_MUSIC)
+             if (musicDir != null) {
+                 val destFile = File(musicDir, fileNameWithExt)
+                 exportFile.copyTo(destFile, overwrite = true)
+             }
+         } catch (e: Exception) {
+             Log.w(TAG, "Could not save to external files dir", e)
+         }
+
+         // 7. On Android 10+, also index in device MediaStore Music library
+         try {
+             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                 val resolver = context.contentResolver
+                 val contentValues = ContentValues().apply {
+                     put(MediaStore.Audio.Media.DISPLAY_NAME, fileNameWithExt)
+                     put(MediaStore.Audio.Media.TITLE, sanitized)
+                     put(MediaStore.Audio.Media.MIME_TYPE, "audio/wav")
+                     put(MediaStore.Audio.Media.RELATIVE_PATH, "${Environment.DIRECTORY_MUSIC}/ShredSheets")
+                     put(MediaStore.Audio.Media.IS_PENDING, 1)
+                 }
+                 val uri = resolver.insert(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, contentValues)
+                 if (uri != null) {
+                     resolver.openOutputStream(uri)?.use { out ->
+                         exportFile.inputStream().use { input -> input.copyTo(out) }
+                     }
+                     contentValues.clear()
+                     contentValues.put(MediaStore.Audio.Media.IS_PENDING, 0)
+                     resolver.update(uri, contentValues, null, null)
+                 }
+             }
+         } catch (e: Exception) {
+             Log.w(TAG, "Could not insert into MediaStore", e)
+         }
+
+         return exportFile
+     }
 
     /**
      * Mixes active takes in real-time during looping playback.

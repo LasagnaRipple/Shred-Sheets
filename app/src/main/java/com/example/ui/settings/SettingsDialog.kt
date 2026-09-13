@@ -59,7 +59,6 @@ import com.example.model.InstrumentRepository
 import com.example.model.InstrumentType
 import com.example.model.LocalizationManager
 import com.example.model.TuningMode
-import com.example.ui.components.AccentColorSwatchPicker
 
 @Composable
 fun SettingsDialog(
@@ -98,7 +97,7 @@ fun SettingsDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "⚙️ Shred Settings",
+                        text = "Settings",
                         style = MaterialTheme.typography.titleLarge.copy(
                             fontWeight = FontWeight.Black
                         ),
@@ -189,25 +188,6 @@ fun SettingsDialog(
                         )
                     }
                 }
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                Text(
-                    text = "Accent Color",
-                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-
-                AccentColorSwatchPicker(
-                    selectedAccent = settings.accentColor,
-                    isDark = isDark,
-                    onSelectAccent = { accent ->
-                        onUpdateSettings(settings.copy(accentColor = accent))
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                )
 
                 Spacer(modifier = Modifier.height(14.dp))
 
@@ -322,23 +302,15 @@ fun SettingsDialog(
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.Security,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Privacy Policy", fontWeight = FontWeight.Bold)
-                        }
-                        Text(
-                            text = "100% Free • No Data 🛡️",
-                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
-                            color = MaterialTheme.colorScheme.primary
+                        Icon(
+                            imageVector = Icons.Default.Security,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary
                         )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Privacy Policy", fontWeight = FontWeight.Bold)
                     }
                 }
 
@@ -385,7 +357,7 @@ fun SettingsDialog(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
-                        text = "🌐 Select Language (40+ Supported)",
+                        text = "🌐 Select Language",
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
                         color = MaterialTheme.colorScheme.primary
                     )

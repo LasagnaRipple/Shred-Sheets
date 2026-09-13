@@ -88,6 +88,60 @@ class TunerScreenshotTest {
     }
 
     @Test
+    fun testTunerScreenIdleShowsModernEyesIcon() {
+        val guitarConfig = InstrumentRepository.getConfig(InstrumentType.GUITAR)
+        val tuning = guitarConfig.tunings.first()
+
+        composeTestRule.setContent {
+            ShredSheetsTheme(
+                styleTheme = AppStyleTheme.ROCK,
+                colorMode = ColorMode.DARK
+            ) {
+                TunerScreen(
+                    pitchResult = PitchResult(
+                        frequency = 0.0,
+                        noteName = "E2",
+                        noteLetter = "E",
+                        octave = 2,
+                        targetFrequency = 82.41,
+                        centsDiff = 0.0,
+                        isInTune = false,
+                        isClose = false,
+                        amplitude = 0.0,
+                        confidence = 0.0
+                    ),
+                    hasSignal = false,
+                    isListening = false,
+                    isTunerActive = false,
+                    instrumentType = InstrumentType.GUITAR,
+                    tuningMode = tuning,
+                    styleTheme = AppStyleTheme.ROCK,
+                    soundEnabled = true,
+                    isAutoMode = true,
+                    selectedString = tuning.strings.first(),
+                    activeInTuneStringNumber = null,
+                    anagramWords = listOf("Every", "Angry", "Dad", "Gets", "Bad", "Eggs"),
+                    anagramSentence = "Every Angry Dad Gets Bad Eggs",
+                    onInstrumentClick = {},
+                    onTuningClick = {},
+                    onThemeToggle = {},
+                    onSoundToggle = {},
+                    onSettingsClick = {},
+                    onToggleAutoMode = {},
+                    onStringSelected = {},
+                    onPlayReferenceTone = {},
+                    onAnagramBarClick = {},
+                    onRequestMicrophonePermission = {},
+                    hasMicrophonePermission = true
+                )
+            }
+        }
+
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("modern_eyes_icon").assertExists()
+    }
+
+    @Test
     fun testChordLibraryScreenRenders() {
         composeTestRule.setContent {
             ShredSheetsTheme(

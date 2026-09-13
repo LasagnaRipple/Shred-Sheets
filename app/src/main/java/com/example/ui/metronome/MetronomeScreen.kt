@@ -9,7 +9,10 @@ import android.os.VibratorManager
 import android.view.HapticFeedbackConstants
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -52,10 +55,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
@@ -67,12 +72,17 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.model.DrumStyle
 import com.example.model.MetronomeSoundMode
 import com.example.ui.theme.LocalIsDarkTheme
+import kotlinx.coroutines.launch
 import com.example.ui.theme.VibrantDarkBorder
 import com.example.ui.theme.VibrantDarkCard
 import com.example.ui.theme.VibrantDarkSurface
@@ -101,6 +111,7 @@ fun MetronomeScreen(
     drumStyle: DrumStyle = DrumStyle.ROCK,
     onSoundModeChange: (MetronomeSoundMode) -> Unit = {},
     onDrumStyleChange: (DrumStyle) -> Unit = {},
+    onThemeToggle: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val haptic = LocalHapticFeedback.current
@@ -163,7 +174,10 @@ fun MetronomeScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceBetween
     ) {
-        // Section Header (aligned to Chord Library page)
+        // Section Header (aligned to Chord Library page, tap title to cycle accent)
+        val titleScale = remember { Animatable(1f) }
+        val titleScope = rememberCoroutineScope()
+
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -172,16 +186,43 @@ fun MetronomeScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Metronome",
-                    style = MaterialTheme.typography.headlineLarge.copy(
-                        fontWeight = FontWeight.Black,
-                        fontSize = 32.sp,
-                        lineHeight = 36.sp,
-                        letterSpacing = (-0.5).sp
-                    ),
-                    color = MaterialTheme.colorScheme.primary
-                )
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            titleScope.launch {
+                                titleScale.animateTo(0.90f, animationSpec = tween(70))
+                                titleScale.animateTo(
+                                    1f,
+                                    animationSpec = spring(
+                                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                                        stiffness = Spring.StiffnessMedium
+                                    )
+                                )
+                            }
+                            onThemeToggle()
+                        }
+                        .padding(horizontal = 4.dp, vertical = 2.dp)
+                        .semantics {
+                            role = Role.Button
+                            contentDescription = "Metronome title. Tap to cycle accent color theme."
+                        }
+                        .testTag("header_metronome_title"),
+                    contentAlignment = Alignment.CenterStart
+                ) {
+                    Text(
+                        text = "Metronome",
+                        style = MaterialTheme.typography.headlineLarge.copy(
+                            fontWeight = FontWeight.Black,
+                            fontSize = 32.sp,
+                            lineHeight = 36.sp,
+                            letterSpacing = (-0.5).sp
+                        ),
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.scale(titleScale.value)
+                    )
+                }
             }
 
             IconButton(

@@ -99,5 +99,29 @@ class MusicalPitchHelperTest {
         val (freqBass, confBass) = pitchDetector.detectPitchMPM(sineBassE, bufferLength, sampleRate)
         assertTrue("Expected bass confidence > 0.75 but was $confBass", confBass > 0.75)
         assertEquals(41.2, freqBass, 0.3)
+
+        // 3. Synthesize Guitar Low E (82.41 Hz) with strong 2nd (164.8 Hz) and 3rd (247.2 Hz) harmonics
+        val guitarLowE = FloatArray(bufferLength)
+        for (i in 0 until bufferLength) {
+            val t = i.toDouble() / sampleRate
+            guitarLowE[i] = (
+                0.55 * kotlin.math.sin(2.0 * Math.PI * 82.41 * t) +
+                0.75 * kotlin.math.sin(2.0 * Math.PI * 164.82 * t) +
+                0.40 * kotlin.math.sin(2.0 * Math.PI * 247.23 * t)
+            ).toFloat()
+        }
+        val (freqGuitarE, confGuitarE) = pitchDetector.detectPitchMPM(guitarLowE, bufferLength, sampleRate)
+        assertTrue("Expected guitar confidence > 0.6 but was $confGuitarE", confGuitarE > 0.6)
+        assertEquals(82.41, freqGuitarE, 0.5)
+
+        // 4. Test evaluateAgainstString
+        val standardE2 = com.example.model.InstrumentRepository.GUITAR_STANDARD.strings.first()
+        val evaluatedInTune = MusicalPitchHelper.evaluateAgainstString(82.5, standardE2, 0.8, 0.9)
+        assertTrue(evaluatedInTune.isInTune)
+        assertTrue(kotlin.math.abs(evaluatedInTune.centsDiff) < 2.0)
+
+        val evaluatedSharp = MusicalPitchHelper.evaluateAgainstString(84.0, standardE2, 0.8, 0.9)
+        assertFalse(evaluatedSharp.isInTune)
+        assertTrue(evaluatedSharp.centsDiff > 30.0) // ~33 cents sharp
     }
 }

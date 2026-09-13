@@ -57,6 +57,8 @@ import com.example.ui.loop.LoopStationScreen
 import com.example.ui.metronome.MetronomeScreen
 import com.example.ui.onboarding.OnboardingScreen
 import com.example.ui.settings.SettingsDialog
+import com.example.ui.shop.ShopScreen
+import com.example.ui.theme.LocalIsDarkTheme
 import com.example.ui.theme.ShredSheetsTheme
 import com.example.ui.tuner.TunerScreen
 import com.example.viewmodel.AppTab
@@ -165,6 +167,7 @@ fun MainAppContent(
     viewModel: MainViewModel,
     onRequestPermission: () -> Unit
 ) {
+    val isDark = LocalIsDarkTheme.current
     val settings by viewModel.settings.collectAsState()
     val currentTab by viewModel.currentTab.collectAsState()
     val pitchResult by viewModel.pitchState.collectAsState()
@@ -197,6 +200,8 @@ fun MainAppContent(
     val currentConfig = viewModel.getCurrentConfig()
     val currentTuning = viewModel.getCurrentTuning()
     val anagramWords = viewModel.getAnagramWords()
+    val isChordSoundEnabled by viewModel.isChordSoundEnabled.collectAsState()
+    val selectedChordId by viewModel.selectedChordId.collectAsState()
 
     if (!settings.isOnboardingCompleted) {
         OnboardingScreen(
@@ -254,7 +259,7 @@ fun MainAppContent(
                                 anagramSentence = settings.currentAnagramSentence,
                                 onInstrumentClick = { viewModel.openInstrumentPicker() },
                                 onTuningClick = { viewModel.openTuningPicker() },
-                                onThemeToggle = { viewModel.toggleTheme() },
+                                onThemeToggle = { viewModel.toggleTheme(isDark) },
                                 onSoundToggle = { viewModel.toggleSound() },
                                 onSettingsClick = { viewModel.openSettings() },
                                 onToggleAutoMode = { viewModel.toggleAutoMode() },
@@ -281,10 +286,16 @@ fun MainAppContent(
                             ChordLibraryScreen(
                                 instrumentType = settings.selectedInstrument,
                                 onStrumChord = { chord -> viewModel.strumChord(chord) },
+                                isSoundEnabled = isChordSoundEnabled,
+                                onToggleSound = { viewModel.toggleChordSound() },
+                                initialChordId = selectedChordId,
+                                onChordSelected = { chord -> viewModel.setSelectedChordId(chord.id) },
+                                onThemeToggle = { viewModel.toggleTheme(isDark) },
                                 modifier = Modifier.fillMaxSize()
                             )
                         }
 
+                        /* Metronome tab hidden per request - Loop Station includes all metronome functions
                         AppTab.METRONOME -> {
                             MetronomeScreen(
                                 bpm = bpm,
@@ -299,13 +310,22 @@ fun MainAppContent(
                                 onTimeSignatureChange = { viewModel.setMetronomeTimeSignature(it) },
                                 onSoundModeChange = { viewModel.setMetronomeSoundMode(it) },
                                 onDrumStyleChange = { viewModel.setDrumStyle(it) },
+                                onThemeToggle = { viewModel.toggleTheme(isDark) },
                                 modifier = Modifier.fillMaxSize()
                             )
                         }
+                        */
 
                         AppTab.LOOP -> {
                             LoopStationScreen(
                                 viewModel = viewModel,
+                                onThemeToggle = { viewModel.toggleTheme(isDark) },
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+
+                        AppTab.SHOP -> {
+                            ShopScreen(
                                 modifier = Modifier.fillMaxSize()
                             )
                         }

@@ -91,4 +91,27 @@ class HapticFeedbackManager(context: Context) {
             }
         } catch (_: Exception) {}
     }
+
+    /**
+     * Rhythmic multi-impact haptic pattern mimicking the crisp toss, floor impacts,
+     * rebounds, and final settle of a tumbling rolled die.
+     */
+    fun performDiceRollFeedback() {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val timings = longArrayOf(0, 15, 90, 25, 75, 18, 62, 14)
+                val amplitudes = intArrayOf(0, 190, 0, 250, 0, 175, 0, 120)
+                if (vibrator != null && vibrator.hasVibrator()) {
+                    if (vibrator.hasAmplitudeControl()) {
+                        vibrator.vibrate(VibrationEffect.createWaveform(timings, amplitudes, -1))
+                    } else {
+                        vibrator.vibrate(VibrationEffect.createWaveform(timings, -1))
+                    }
+                }
+            } else {
+                @Suppress("DEPRECATION")
+                vibrator?.vibrate(longArrayOf(0, 15, 90, 25, 75, 18, 62, 14), -1)
+            }
+        } catch (_: Exception) {}
+    }
 }

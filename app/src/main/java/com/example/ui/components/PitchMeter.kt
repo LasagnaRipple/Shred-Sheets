@@ -2,6 +2,7 @@ package com.example.ui.components
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.spring
@@ -59,7 +60,7 @@ fun PitchMeter(
     val cents = if (isTunerActive && hasSignal) pitchResult.centsDiff.coerceIn(-50.0, 50.0).toFloat() else 0f
     val animatedCents by animateFloatAsState(
         targetValue = cents,
-        animationSpec = spring(stiffness = 400f),
+        animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = 1200f),
         label = "animatedCents"
     )
 
@@ -142,7 +143,7 @@ fun PitchRulerGauge(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(112.dp)
+            .height(140.dp)
             .clip(RoundedCornerShape(20.dp))
             .background(if (isDark) Color(0xFF14191F) else MaterialTheme.colorScheme.surfaceVariant)
             .then(
@@ -163,8 +164,15 @@ fun PitchRulerGauge(
 
             val minorTickColor = if (isDark) Color(0xFF2A3440) else Color(0xFFCBD5E1)
             val majorTickColor = if (isDark) Color(0xFF4A5666) else Color(0xFF94A3B8)
-            val minorTickHeight = height * 0.42f
-            val majorTickHeight = height * 0.68f
+            val minorTickHeight = height * 0.46f
+            val majorTickHeight = height * 0.74f
+
+            val caretSize = 4.2.dp.toPx()
+            val caretTop = 1.5.dp.toPx()
+            val caretBottom = height - 1.5.dp.toPx()
+            val caretTipHeight = caretSize * 1.5f
+            val maxCenterLineHeight = height - (caretTop + caretTipHeight + 1.5.dp.toPx()) * 2f
+            val centerLineHeight = (majorTickHeight * 1.30f).coerceAtMost(maxCenterLineHeight)
 
             val numStrings = stringCount.coerceAtLeast(1)
             val colWidth = width / numStrings
@@ -188,7 +196,11 @@ fun PitchRulerGauge(
                 val pluckOffset = if (isVibrating) pluckAnim.value * 3.5.dp.toPx() else 0f
                 val vibrationAlpha = if (isVibrating) kotlin.math.abs(pluckAnim.value) else 0f
 
-                val tickHeight = if (isMajor) majorTickHeight else minorTickHeight
+                val tickHeight = when {
+                    isCenter -> centerLineHeight
+                    isMajor -> majorTickHeight
+                    else -> minorTickHeight
+                }
                 val tickColor = when {
                     isVibrating -> statusColor
                     isCenter && isInTune && hasSignal && isTunerActive -> statusColor
@@ -233,18 +245,30 @@ fun PitchRulerGauge(
                 currentX += step
             }
 
-            // Draw center target caret ▲ at bottom
-            val caretSize = 4.5.dp.toPx()
-            val caretBottom = height - 2.dp.toPx()
-            val caretPath = Path().apply {
-                moveTo(centerX, caretBottom - caretSize * 1.5f)
+            val caretColor = if (isInTune && hasSignal && isTunerActive) statusColor else (if (isDark) Color(0xFF4A5666) else Color(0xFF94A3B8))
+
+            // Draw center target caret ▼ at top (pointing down)
+            val topCaretPath = Path().apply {
+                moveTo(centerX, caretTop + caretTipHeight)
+                lineTo(centerX - caretSize, caretTop)
+                lineTo(centerX + caretSize, caretTop)
+                close()
+            }
+            drawPath(
+                path = topCaretPath,
+                color = caretColor
+            )
+
+            // Draw center target caret ▲ at bottom (pointing up)
+            val bottomCaretPath = Path().apply {
+                moveTo(centerX, caretBottom - caretTipHeight)
                 lineTo(centerX - caretSize, caretBottom)
                 lineTo(centerX + caretSize, caretBottom)
                 close()
             }
             drawPath(
-                path = caretPath,
-                color = if (isInTune && hasSignal && isTunerActive) statusColor else (if (isDark) Color(0xFF4A5666) else Color(0xFF94A3B8))
+                path = bottomCaretPath,
+                color = caretColor
             )
 
             // Draw active sweeping needle

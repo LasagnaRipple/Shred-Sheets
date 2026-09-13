@@ -5,6 +5,8 @@ import android.graphics.Typeface
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -31,6 +33,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.Info
@@ -61,6 +64,10 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -87,14 +94,27 @@ import kotlinx.coroutines.launch
 fun ChordLibraryScreen(
     instrumentType: InstrumentType,
     onStrumChord: (ChordItem) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isSoundEnabled: Boolean = false,
+    onToggleSound: () -> Unit = {},
+    initialChordId: String? = null,
+    onChordSelected: ((ChordItem) -> Unit)? = null,
+    onThemeToggle: () -> Unit = {}
 ) {
     val allChords = remember(instrumentType) {
         ChordRepository.getChordsForInstrument(instrumentType)
     }
 
     var selectedCategory by remember { mutableStateOf("All") }
-    var selectedChord by remember(allChords) { mutableStateOf(allChords.firstOrNull()) }
+    var selectedChord by remember(allChords, initialChordId) {
+        mutableStateOf(
+            if (initialChordId != null) {
+                allChords.find { it.id == initialChordId } ?: allChords.firstOrNull()
+            } else {
+                allChords.firstOrNull()
+            }
+        )
+    }
 
     val categories = listOf("All", "Major", "Minor", "7th")
     val filteredChords = remember(allChords, selectedCategory) {
@@ -128,23 +148,53 @@ fun ChordLibraryScreen(
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // 1. Header: "Chord library" in sentence case, brand accent, info icon on right
+        // 1. Header: "Chord library" in sentence case, brand accent, info icon on right (tap title to cycle accent)
+        val titleScale = remember { Animatable(1f) }
+        val titleScope = rememberCoroutineScope()
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Chord library",
-                    style = MaterialTheme.typography.headlineLarge.copy(
-                        fontWeight = FontWeight.Black,
-                        fontSize = 32.sp,
-                        lineHeight = 36.sp,
-                        letterSpacing = (-0.5).sp
-                    ),
-                    color = activeAccent
-                )
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            titleScope.launch {
+                                titleScale.animateTo(0.90f, animationSpec = tween(70))
+                                titleScale.animateTo(
+                                    1f,
+                                    animationSpec = spring(
+                                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                                        stiffness = Spring.StiffnessMedium
+                                    )
+                                )
+                            }
+                            onThemeToggle()
+                        }
+                        .padding(horizontal = 4.dp, vertical = 2.dp)
+                        .semantics {
+                            role = Role.Button
+                            contentDescription = "Chord library title. Tap to cycle accent color theme."
+                        }
+                        .testTag("header_chord_library_title"),
+                    contentAlignment = Alignment.CenterStart
+                ) {
+                    Text(
+                        text = "Chord library",
+                        style = MaterialTheme.typography.headlineLarge.copy(
+                            fontWeight = FontWeight.Black,
+                            fontSize = 32.sp,
+                            lineHeight = 36.sp,
+                            letterSpacing = (-0.5).sp
+                        ),
+                        color = activeAccent,
+                        modifier = Modifier.scale(titleScale.value)
+                    )
+                }
             }
 
             // Quick Info button in screen header
@@ -244,17 +294,28 @@ fun ChordLibraryScreen(
                             )
                         }
 
-                        // Speaker / play button: circular outline with ~300ms tap scale pulse
+                        // Sound on/off switch: controls automatic chord playback on selection
                         Box(
                             modifier = Modifier
                                 .scale(speakerScale.value)
                                 .size(42.dp)
                                 .clip(CircleShape)
-                                .background(if (isStrumming) activeAccent else Color.Transparent)
-                                .border(1.5.dp, activeAccent, CircleShape)
+                                .background(
+                                    if (isSoundEnabled) {
+                                        if (isStrumming) activeAccent else activeAccent.copy(alpha = 0.15f)
+                                    } else {
+                                        Color.Transparent
+                                    }
+                                )
+                                .border(
+                                    width = 1.5.dp,
+                                    color = if (isSoundEnabled) activeAccent else cardBorder,
+                                    shape = CircleShape
+                                )
                                 .clickable {
                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    onStrumChord(chord)
+                                    val willBeEnabled = !isSoundEnabled
+                                    onToggleSound()
                                     strumJob?.cancel()
                                     strumJob = coroutineScope.launch {
                                         launch {
@@ -267,18 +328,27 @@ fun ChordLibraryScreen(
                                                 animationSpec = tween(150, easing = FastOutSlowInEasing)
                                             )
                                         }
-                                        isStrumming = true
-                                        delay(1600L)
-                                        isStrumming = false
+                                        if (willBeEnabled) {
+                                            chord.let { onStrumChord(it) }
+                                            isStrumming = true
+                                            delay(1600L)
+                                            isStrumming = false
+                                        } else {
+                                            isStrumming = false
+                                        }
                                     }
                                 }
                                 .testTag("strum_chord_button"),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                imageVector = Icons.AutoMirrored.Filled.VolumeUp,
-                                contentDescription = "Strum Chord",
-                                tint = if (isStrumming) onActiveAccent else activeAccent,
+                                imageVector = if (isSoundEnabled) Icons.AutoMirrored.Filled.VolumeUp else Icons.AutoMirrored.Filled.VolumeOff,
+                                contentDescription = if (isSoundEnabled) "Sound on" else "Sound off",
+                                tint = if (isSoundEnabled) {
+                                    if (isStrumming) onActiveAccent else activeAccent
+                                } else {
+                                    mutedTextColor
+                                },
                                 modifier = Modifier.size(22.dp)
                             )
                         }
@@ -358,6 +428,26 @@ fun ChordLibraryScreen(
                         .clickable {
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             selectedChord = chord
+                            onChordSelected?.invoke(chord)
+                            if (isSoundEnabled) {
+                                onStrumChord(chord)
+                                strumJob?.cancel()
+                                strumJob = coroutineScope.launch {
+                                    launch {
+                                        speakerScale.animateTo(
+                                            targetValue = 1.15f,
+                                            animationSpec = tween(150, easing = FastOutSlowInEasing)
+                                        )
+                                        speakerScale.animateTo(
+                                            targetValue = 1.0f,
+                                            animationSpec = tween(150, easing = FastOutSlowInEasing)
+                                        )
+                                    }
+                                    isStrumming = true
+                                    delay(1600L)
+                                    isStrumming = false
+                                }
+                            }
                         }
                         .padding(horizontal = 4.dp)
                         .testTag("chord_item_${chord.id}"),

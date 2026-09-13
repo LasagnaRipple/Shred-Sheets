@@ -29,10 +29,11 @@ import kotlinx.coroutines.launch
 import kotlin.random.Random
 
 enum class AppTab(val title: String, val icon: String = "") {
-    TUNER("TUNER", ""),
-    CHORDS("CHORDS", ""),
-    METRONOME("CLICK", ""),
-    LOOP("LOOPS", "")
+    TUNER("Tuner", "tuner"),
+    CHORDS("Chords", "chords"),
+    // METRONOME("Metronome", "metronome"), // Hidden per request - loop station has all metronome functions
+    LOOP("Loops", "loop"),
+    SHOP("Shop", "shop")
 }
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
@@ -54,8 +55,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _currentTab = MutableStateFlow(AppTab.TUNER)
     val currentTab: StateFlow<AppTab> = _currentTab.asStateFlow()
 
-    // Pitch Detection State
-    val pitchState: StateFlow<PitchResult> = pitchDetector.pitchState
+    // Pitch Detection State: evaluated accurately against target instrument string
+    private val _pitchState = MutableStateFlow(PitchResult.EMPTY)
+    val pitchState: StateFlow<PitchResult> = _pitchState.asStateFlow()
     val lastPluckEvent: StateFlow<Long> = pitchDetector.lastPluckEvent
 
     // Pair of (targetStringNumber, timestamp) to trigger visual pluck shake on tuning bar tick
@@ -99,6 +101,34 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // Drum Style: ROCK, POP, FOLK, LATIN, SHUFFLE (defaults to ROCK)
     private val _drumStyle = MutableStateFlow(com.example.model.DrumStyle.ROCK)
     val drumStyle: StateFlow<com.example.model.DrumStyle> = _drumStyle.asStateFlow()
+
+    // Chord Screen Sound On/Off State (defaults to false on load; retained during session across tabs)
+    private val _isChordSoundEnabled = MutableStateFlow(false)
+    val isChordSoundEnabled: StateFlow<Boolean> = _isChordSoundEnabled.asStateFlow()
+
+    fun toggleChordSound() {
+        _isChordSoundEnabled.value = !_isChordSoundEnabled.value
+    }
+
+    fun setChordSoundEnabled(enabled: Boolean) {
+        _isChordSoundEnabled.value = enabled
+    }
+
+    // Chord Screen Selected Chord (retained during session across screen switching)
+    private val _selectedChordId = MutableStateFlow<String?>(null)
+    val selectedChordId: StateFlow<String?> = _selectedChordId.asStateFlow()
+
+    fun setSelectedChordId(id: String?) {
+        _selectedChordId.value = id
+    }
+
+    // Export track name for Loop Station mix (defaults to "My track #1")
+    private val _exportTrackName = MutableStateFlow("My track #1")
+    val exportTrackName: StateFlow<String> = _exportTrackName.asStateFlow()
+
+    fun setExportTrackName(name: String) {
+        _exportTrackName.value = name
+    }
 
     private var metronomeJob: Job? = null
     private var loopProgressJob: Job? = null
@@ -160,19 +190,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         // Observe pitch detector results to handle in-tune audio and haptics
         viewModelScope.launch {
-            pitchState.collect { result ->
+            pitchDetector.pitchState.collect { rawResult ->
                 val allStrings = getCurrentTuning().strings
 
-                if (result.frequency > 20.0 && result.confidence > 0.45) {
+                if (rawResult.frequency > 20.0 && rawResult.confidence >= 0.40) {
                     // String strike haptic feedback (disabled when drum loop / click track is playing back)
                     if (_settings.value.hapticsEnabled && !_metronomePlaying.value) {
                         hapticManager.performStringPluckFeedback()
                     }
 
+                    val closestString = MusicalPitchHelper.findClosestString(rawResult.frequency, allStrings)
+                    val centsFromClosest = MusicalPitchHelper.calculateCentsDiff(rawResult.frequency, closestString.targetFrequency)
+
                     // Re-detuning check for already-done strings:
-                    // If pitch drifts out of ±5 cents for >= 200ms sustained, revert string to untuned
-                    val closestString = MusicalPitchHelper.findClosestString(result.frequency, allStrings)
-                    val centsFromClosest = MusicalPitchHelper.calculateCentsDiff(result.frequency, closestString.targetFrequency)
                     if (_tunedStringNumbers.value.contains(closestString.stringNumber)) {
                         if (kotlin.math.abs(centsFromClosest) > 5.0 && kotlin.math.abs(centsFromClosest) < 150.0) {
                             if (detuneCandidateStringNumber != closestString.stringNumber || detuneJob == null || !detuneJob!!.isActive) {
@@ -187,7 +217,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                 }
                             }
                         } else if (kotlin.math.abs(centsFromClosest) <= 5.0) {
-                            // Still in tune, cancel pending detune
                             if (detuneCandidateStringNumber == closestString.stringNumber) {
                                 detuneJob?.cancel()
                                 detuneJob = null
@@ -199,11 +228,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     // In Auto mode, find closest string in tuning
                     if (_settings.value.tunerMode == com.example.model.TunerMode.AUTO) {
                         val currentSelected = _selectedString.value
-                        val isDifferentString = currentSelected == null || currentSelected.stringNumber != closestString.stringNumber
-                        // Only switch if no dwell timer is actively running, or if pitch is clearly closer to another string
-                        if (dwellJob == null || !dwellJob!!.isActive || kotlin.math.abs(centsFromClosest) < 50.0) {
-                            if (isDifferentString) {
-                                // Switching strings cancels dwell timer without penalty
+                        if (currentSelected == null) {
+                            _selectedString.value = closestString
+                        } else if (currentSelected.stringNumber != closestString.stringNumber) {
+                            val centsFromCurrent = kotlin.math.abs(MusicalPitchHelper.calculateCentsDiff(rawResult.frequency, currentSelected.targetFrequency))
+                            // Only switch if pitch is clearly closer to the other string and departed from current string
+                            if (dwellJob == null || !dwellJob!!.isActive || centsFromCurrent > 55.0) {
                                 dwellJob?.cancel()
                                 dwellJob = null
                                 dwellCandidateStringNumber = null
@@ -213,37 +243,54 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         }
                     }
 
-                    val targetStr = _selectedString.value ?: allStrings.firstOrNull()
-                    val targetNum = targetStr?.stringNumber
+                    val targetStr = if (_settings.value.tunerMode == com.example.model.TunerMode.AUTO) {
+                        _selectedString.value ?: closestString
+                    } else {
+                        _selectedString.value ?: allStrings.firstOrNull() ?: closestString
+                    }
+                    val targetNum = targetStr.stringNumber
 
-                    // In-tune dwell check: ±5 cents threshold
-                    val isInTuneTarget = targetStr != null && kotlin.math.abs(result.centsDiff) <= 5.0
+                    // CRITICAL: Evaluate pitch accurately against target instrument string!
+                    val evaluated = MusicalPitchHelper.evaluateAgainstString(
+                        detectedFreq = rawResult.frequency,
+                        targetString = targetStr,
+                        amplitude = rawResult.amplitude,
+                        confidence = rawResult.confidence
+                    )
+                    _pitchState.value = evaluated
 
-                    if (isInTuneTarget && targetNum != null) {
+                    // In-tune dwell check based on the TARGET STRING's actual frequency
+                    val isInTuneTarget = evaluated.isInTune
+
+                    if (isInTuneTarget) {
                         _activeInTuneStringNumber.value = targetNum
 
-                        // Start dwell timer (600ms) if not already confirmed or running
+                        // Start dwell timer (550ms) if not already confirmed or running
                         if (!_tunedStringNumbers.value.contains(targetNum)) {
                             if (dwellCandidateStringNumber != targetNum || dwellJob == null || !dwellJob!!.isActive) {
                                 dwellCandidateStringNumber = targetNum
                                 dwellJob?.cancel()
                                 dwellJob = viewModelScope.launch {
-                                    delay(600) // 500-700ms dwell timer
+                                    delay(550) // 550ms dwell timer
                                     onStringDwellCompleted(targetNum, targetStr)
                                 }
                             }
                         }
                     } else {
                         _activeInTuneStringNumber.value = null
-                        // If pitch clearly departs the target range (> 5 cents), cancel dwell timer
-                        if (kotlin.math.abs(result.centsDiff) > 5.0) {
+                        // If pitch departs the target range (> 4.5 cents), cancel dwell timer
+                        if (kotlin.math.abs(evaluated.centsDiff) > 4.5) {
                             dwellJob?.cancel()
                             dwellJob = null
                             dwellCandidateStringNumber = null
                         }
                     }
                 } else {
+                    _pitchState.value = PitchResult.EMPTY
                     _activeInTuneStringNumber.value = null
+                    dwellJob?.cancel()
+                    dwellJob = null
+                    dwellCandidateStringNumber = null
                 }
             }
         }
@@ -406,6 +453,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (tab == AppTab.TUNER && previousTab != AppTab.TUNER) {
             // When returning to the tuner tab, toggle Auto detect to ON
             _settings.value = _settings.value.copy(tunerMode = com.example.model.TunerMode.AUTO)
+        } else if (tab == AppTab.CHORDS) {
+            toneSynthesizer.warmUp()
         }
         updateListeningState()
         if (_settings.value.hapticsEnabled) {
@@ -465,6 +514,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _settings.value = _settings.value.copy(tunerMode = com.example.model.TunerMode.MANUAL)
         _promptNextString.value = null
 
+        val currentPitch = pitchDetector.pitchState.value
+        if (currentPitch.frequency > 20.0) {
+            _pitchState.value = MusicalPitchHelper.evaluateAgainstString(
+                currentPitch.frequency,
+                string,
+                currentPitch.amplitude,
+                currentPitch.confidence
+            )
+        }
+
         if (_settings.value.soundEffectsEnabled) {
             toneSynthesizer.playPluckedTone(string.targetFrequency)
         }
@@ -506,8 +565,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun toggleTheme() {
-        val isDark = _settings.value.colorMode == com.example.model.ColorMode.DARK
+    fun toggleTheme(isDarkOverride: Boolean? = null) {
+        val isDark = isDarkOverride ?: when (_settings.value.colorMode) {
+            com.example.model.ColorMode.DARK -> true
+            com.example.model.ColorMode.LIGHT -> false
+            com.example.model.ColorMode.SYSTEM -> true
+        }
         val allowed = com.example.model.AccentColor.entries.filter { if (isDark) it.darkAllowed else it.lightAllowed }
         val currentIndex = allowed.indexOf(_settings.value.accentColor)
         val nextAccent = if (currentIndex >= 0) allowed[(currentIndex + 1) % allowed.size] else allowed.first()
@@ -710,23 +773,36 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         metronomeJob?.cancel()
         metronomeJob = viewModelScope.launch(Dispatchers.Default) {
             var beatCounter = 0
+            var current = 1
             var nextBeatNano = System.nanoTime()
             while (isActive && _metronomePlaying.value) {
+                _metronomeCurrentBeat.value = current
                 val bpm = _metronomeBpm.value
                 val intervalNanos = (60_000_000_000L / bpm).coerceAtLeast(100_000_000L)
-                val current = _metronomeCurrentBeat.value
                 val isAccent = current == 1
 
                 if (_settings.value.soundEffectsEnabled) {
-                    if (_metronomeSoundMode.value == com.example.model.MetronomeSoundMode.CLICK) {
-                        toneSynthesizer.playMetronomeTick(isAccent)
+                    val isLoopContext = _currentTab.value == AppTab.LOOP ||
+                            loopStationEngine.recordingTrackIndex.value != null ||
+                            loopStationEngine.armedTrackIndex.value != null
+
+                    val volume = if (isLoopContext) {
+                        loopStationEngine.backingVolume.value
                     } else {
-                        val hits = com.example.model.DrumPatternEngine.getHitsForBeat(
-                            style = com.example.model.DrumStyle.ROCK,
-                            timeSignatureBeats = _metronomeTimeSignature.value,
-                            beat = current
-                        )
-                        toneSynthesizer.playDrumHits(hits)
+                        0.85f
+                    }
+
+                    if (volume > 0.001f) {
+                        if (_metronomeSoundMode.value == com.example.model.MetronomeSoundMode.CLICK) {
+                            toneSynthesizer.playMetronomeTick(isAccent, volume = volume)
+                        } else {
+                            val hits = com.example.model.DrumPatternEngine.getHitsForBeat(
+                                style = _drumStyle.value,
+                                timeSignatureBeats = _metronomeTimeSignature.value,
+                                beat = current
+                            )
+                            toneSynthesizer.playDrumHits(hits, volume = volume)
+                        }
                     }
                 }
                 // Haptic feedback is disabled when drum loop / click track is playing back to the user
@@ -741,7 +817,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 beatCounter++
                 val beats = _metronomeTimeSignature.value
                 val nextBeat = if (current >= beats) 1 else current + 1
-                _metronomeCurrentBeat.value = nextBeat
 
                 // Drift-free scheduling: compute exact next target timestamp
                 nextBeatNano += intervalNanos
@@ -752,6 +827,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     // If fell severely behind (e.g. system pause), re-sync base
                     nextBeatNano = System.nanoTime()
                 }
+
+                current = nextBeat
             }
         }
 
@@ -850,17 +927,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         loopStationEngine.clearAllTakes()
     }
 
-    suspend fun bounceMix(): java.io.File {
+    suspend fun bounceMix(trackName: String = _exportTrackName.value): java.io.File {
         return loopStationEngine.bounceMix(
             isDrums = _metronomeSoundMode.value == com.example.model.MetronomeSoundMode.DRUMS,
             drumStyle = _drumStyle.value,
             bpm = _metronomeBpm.value,
-            timeSignature = _metronomeTimeSignature.value
+            timeSignature = _metronomeTimeSignature.value,
+            trackName = trackName
         )
     }
 
     fun tapTempo() {
         val now = System.currentTimeMillis()
+        if (tapTimestamps.isNotEmpty() && (now - tapTimestamps.last() > 2000L)) {
+            tapTimestamps.clear()
+        }
         tapTimestamps.add(now)
         if (tapTimestamps.size > 4) {
             tapTimestamps.removeAt(0)
@@ -880,8 +961,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
             if (intervals.isNotEmpty()) {
                 val avgInterval = intervals.average()
-                val calculatedBpm = (60_000.0 / avgInterval).toInt().coerceIn(40, 240)
-                _metronomeBpm.value = calculatedBpm
+                val calculatedBpm = (60_000.0 / avgInterval).toInt().coerceIn(30, 240)
+                setMetronomeBpm(calculatedBpm)
             }
         }
     }

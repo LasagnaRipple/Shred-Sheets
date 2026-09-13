@@ -89,6 +89,139 @@ class ToneSynthesizer {
         }
     }
 
+    /**
+     * Dedicated physical-modeling string synthesizer for authentic, distortion-free chord playback.
+     * Uses Karplus-Strong string synthesis with triangular pick displacement, warm acoustic lowpass
+     * filtering, allpass fractional delay tuning, and calibrated linear headroom.
+     */
+    private class KarplusStrongChordString(
+        val frequency: Double,
+        val durationSamples: Int,
+        val volume: Float,
+        seed: Long = System.nanoTime()
+    ) : SoundVoice {
+        // Exact loop delay calculation accounting for the 0.5 sample FIR filter delay
+        private val exactDelay = (SAMPLE_RATE / frequency).coerceIn(20.0, 3000.0)
+        private val integerDelay = (exactDelay - 0.5).toInt().coerceAtLeast(10)
+        private val fracDelay = ((exactDelay - 0.5) - integerDelay).coerceIn(0.0, 1.0)
+        // First-order allpass coefficient for exact fractional delay tuning: C = (1 - D) / (1 + D)
+        private val allpassC = if (fracDelay > 0.001) ((1.0 - fracDelay) / (1.0 + fracDelay)).toFloat() else 0f
+
+        private val bufferLength = integerDelay
+        private val buffer = FloatArray(bufferLength)
+        private var readIndex = 0
+        private var sampleCount = 0
+
+        private var prevAllpassIn = 0f
+        private var prevAllpassOut = 0f
+
+        private var isFadingOut = false
+        private var fadeRemaining = 0
+        private var fadeStart = 0
+
+        // Frequency-dependent acoustic decay: lower strings sustain longer (~2.6s), higher ~1.8s
+        private val decayFactor: Float
+
+        init {
+            val targetSustainSec = when {
+                frequency < 130.0 -> 2.6
+                frequency < 220.0 -> 2.3
+                frequency < 330.0 -> 2.0
+                else -> 1.8
+            }
+            val loops = (frequency * targetSustainSec).coerceAtLeast(25.0)
+            decayFactor = kotlin.math.exp(-2.9 / loops).toFloat()
+
+            // Initialize buffer with warm acoustic pick excitation:
+            // 1. Triangular string displacement matching pick location (~18% from bridge)
+            // 2. Gentle filtered friction noise simulating celluloid pick release
+            val random = java.util.Random(seed)
+            var lpNoise = 0f
+            val pickPos = 0.18
+
+            for (i in 0 until bufferLength) {
+                val whiteNoise = (random.nextFloat() * 2f - 1f)
+                // 1-pole lowpass filter to remove harsh digital static above 4 kHz
+                lpNoise = lpNoise * 0.42f + whiteNoise * 0.58f
+
+                // Triangular physical displacement profile of plucked string
+                val pos = i.toDouble() / bufferLength
+                val displacement = if (pos < pickPos) {
+                    pos / pickPos
+                } else {
+                    (1.0 - pos) / (1.0 - pickPos)
+                }
+
+                buffer[i] = (displacement.toFloat() * 0.55f + lpNoise * 0.45f)
+            }
+
+            // Zero-out DC offset to eliminate onset clicks or asymmetric headroom loss
+            var sum = 0.0
+            for (i in 0 until bufferLength) {
+                sum += buffer[i]
+            }
+            val dcOffset = (sum / bufferLength).toFloat()
+            for (i in 0 until bufferLength) {
+                buffer[i] -= dcOffset
+            }
+        }
+
+        override fun triggerFadeOut(fadeSamples: Int) {
+            if (!isFadingOut || fadeRemaining > fadeSamples) {
+                isFadingOut = true
+                fadeRemaining = fadeSamples
+                fadeStart = fadeSamples
+            }
+        }
+
+        override fun isFinished(): Boolean {
+            return sampleCount >= durationSamples || (isFadingOut && fadeRemaining <= 0)
+        }
+
+        override fun nextSample(): Double {
+            if (isFinished()) return 0.0
+
+            val current = buffer[readIndex]
+            val nextIdx = if (readIndex + 1 >= bufferLength) 0 else readIndex + 1
+            val next = buffer[nextIdx]
+
+            // Two-point moving average lowpass filter (simulates string internal damping)
+            val filtered = (current + next) * 0.5f * decayFactor
+
+            // Allpass fractional delay filter to guarantee dead-accurate musical pitch
+            val feedbackSample = if (allpassC > 0.001f) {
+                val apOut = allpassC * filtered + prevAllpassIn - allpassC * prevAllpassOut
+                prevAllpassIn = filtered
+                prevAllpassOut = apOut
+                apOut
+            } else {
+                filtered
+            }
+
+            buffer[readIndex] = feedbackSample
+            readIndex = nextIdx
+            sampleCount++
+
+            var out = current.toDouble() * volume
+
+            // Smooth 1.5ms onset envelope to eliminate edge clicks
+            val attackSamples = (SAMPLE_RATE * 0.0015).toInt().coerceAtLeast(1)
+            if (sampleCount < attackSamples) {
+                val ratio = sampleCount.toDouble() / attackSamples
+                out *= (0.5 * (1.0 - cos(PI * ratio)))
+            }
+
+            if (isFadingOut) {
+                val fadeRatio = (fadeRemaining.toDouble() / fadeStart.coerceAtLeast(1)).coerceIn(0.0, 1.0)
+                val fadeEnvelope = 0.5 * (1.0 - cos(PI * fadeRatio))
+                fadeRemaining--
+                out *= fadeEnvelope
+            }
+
+            return out
+        }
+    }
+
     private class Voice(
         val frequency: Double,
         val maxDurationSamples: Int,
@@ -147,14 +280,28 @@ class ToneSynthesizer {
 
             sampleIndex++
 
+            // Smooth end-of-track release envelope:
+            // Keeps the acoustic sound and harmonics 100% unaltered throughout the entire body of the note.
+            // During the final ~150ms (~6,615 samples) before maxDurationSamples,
+            // it smoothly and tangentially glides down to 0.0 via a raised-cosine curve,
+            // eliminating the sudden step truncation that caused the end-of-track crackle and distortion.
+            val tailSamples = (SAMPLE_RATE * 0.15).toInt().coerceAtLeast(100)
+            val remainingSamples = maxDurationSamples - sampleIndex
+            val tailEnvelope = if (remainingSamples < tailSamples) {
+                val ratio = (remainingSamples.toDouble() / tailSamples).coerceIn(0.0, 1.0)
+                0.5 * (1.0 - cos(PI * ratio))
+            } else {
+                1.0
+            }
+
             if (isFadingOut) {
                 val fadeRatio = (fadeOutRemaining.toDouble() / fadeOutStartRemaining.coerceAtLeast(1)).coerceIn(0.0, 1.0)
                 val fadeEnvelope = 0.5 * (1.0 - cos(PI * fadeRatio))
                 fadeOutRemaining--
-                return sample * fadeEnvelope
+                return sample * minOf(fadeEnvelope, tailEnvelope)
             }
 
-            return sample
+            return sample * tailEnvelope
         }
     }
 
@@ -333,28 +480,49 @@ class ToneSynthesizer {
     }
 
     /**
-     * Strums an entire chord (arpeggiated quickly).
+     * Strums an entire chord with pristine acoustic physical modeling.
+     * Calibrates multi-string gain to preserve clean linear headroom (eliminating distortion),
+     * fires the first string immediately with zero startup delay, and strums through strings
+     * at an authentic, tight 12ms pick speed.
      */
     fun strumChord(frequencies: List<Double>, volume: Float = 0.65f) {
+        // Ensure low-latency audio streaming track is active immediately before coroutine dispatch
+        ensureAudioLoopRunning()
+
         synthScope.launch {
-            // Dampen prior chord voices smoothly
+            // Smoothly fade out previous chord strings over ~18ms (800 samples)
+            // to allow rapid re-strumming without clipping or audible pops
             for (v in voices) {
-                if (!v.isPercussiveVoice) {
-                    v.triggerFadeOut(1200)
+                if (v is KarplusStrongChordString) {
+                    v.triggerFadeOut(800)
                 }
             }
-            for (freq in frequencies) {
-                if (freq > 20.0) {
-                    val voice = Voice(
-                        frequency = freq,
-                        maxDurationSamples = (SAMPLE_RATE * 1.8).toInt(),
-                        volume = volume.coerceIn(0.1f, 1.0f),
-                        isPercussive = false
-                    )
-                    voices.add(voice)
-                    ensureAudioLoopRunning()
+
+            val validFreqs = frequencies.filter { it > 20.0 }
+            if (validFreqs.isEmpty()) return@launch
+
+            val numStrings = validFreqs.size
+            // Calibrate individual string volumes so the combined chord waveform stays safely
+            // within the linear range (below the 0.80 limiter threshold), guaranteeing zero distortion
+            val perStringVolume = (volume * 0.50f / kotlin.math.sqrt(numStrings.toDouble())).toFloat()
+
+            val durationSamples = (SAMPLE_RATE * 2.4).toInt()
+            // 12ms per string simulates a natural, tight acoustic guitar down-strum
+            val strumDelayMs = 12L
+
+            for ((index, freq) in validFreqs.withIndex()) {
+                val voice = KarplusStrongChordString(
+                    frequency = freq,
+                    durationSamples = durationSamples,
+                    volume = perStringVolume,
+                    seed = System.nanoTime() + index * 37L
+                )
+                voices.add(voice)
+
+                // Stagger subsequent strings with tight 12ms spacing
+                if (index < validFreqs.size - 1) {
+                    delay(strumDelayMs)
                 }
-                delay(35)
             }
         }
     }

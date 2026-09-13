@@ -1,5 +1,9 @@
 package com.example.ui.components
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -10,6 +14,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -30,6 +35,8 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -41,9 +48,14 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.launch
 import com.example.R
 import com.example.model.AppStyleTheme
 import com.example.model.InstrumentType
@@ -85,16 +97,44 @@ fun RockHeader(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Left: Arched Logo in Vibrant Palette typography
-            Column {
+            // Left: Arched Logo in Vibrant Palette typography (tap to cycle accent color)
+            val logoScale = remember { Animatable(1f) }
+            val coroutineScope = rememberCoroutineScope()
+
+            Box(
+                modifier = Modifier
+                    .defaultMinSize(minWidth = 48.dp, minHeight = 44.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        coroutineScope.launch {
+                            logoScale.animateTo(0.88f, animationSpec = tween(70))
+                            logoScale.animateTo(
+                                1f,
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                                    stiffness = Spring.StiffnessMedium
+                                )
+                            )
+                        }
+                        onThemeToggle()
+                    }
+                    .padding(horizontal = 4.dp, vertical = 4.dp)
+                    .semantics {
+                        role = Role.Button
+                        contentDescription = "Shred Sheets logo. Tap to cycle accent color theme."
+                    }
+                    .testTag("header_shred_sheets_logo"),
+                contentAlignment = Alignment.CenterStart
+            ) {
                 Image(
                     painter = painterResource(id = R.drawable.ic_shred_sheets_logo),
-                    contentDescription = "SHRED SHEETS",
+                    contentDescription = null,
                     colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.primary),
                     modifier = Modifier
                         .height(30.dp)
                         .widthIn(max = 140.dp)
-                        .testTag("header_shred_sheets_logo"),
+                        .scale(logoScale.value),
                     contentScale = ContentScale.Fit
                 )
             }

@@ -59,20 +59,19 @@ class PitchDetector {
     private var isRecording = false
     private var recordingJob: Job? = null
 
-    // Kalman / Smoothing State for rock-steady needle
-    private var kalmanFrequency = 0.0
-    private var kalmanVariance = 1.0
+    // Pitch Stabilizer State for rock-steady needle without lag
+    private val stabilizer = PitchStabilizer()
     private var lastPluckTimestamp = 0L
     private var previousRms = 0.0
 
     companion object {
         private const val TAG = "PitchDetector"
         const val SAMPLE_RATE = 44100
-        // 8192 samples = ~186ms window. Crucial for bass guitar (Low B is 30.87Hz = ~1428 samples period)
-        const val BUFFER_SIZE = 8192
-        const val HOP_SIZE = 2048 // 75% overlap for continuous 21.5 fps pitch refresh rate
-        private const val NOISE_FLOOR_RMS = 0.006 // Sensitive yet rejects ambient noise
-        private const val ATTACK_SPIKE_RMS_RATIO = 2.4 // Ratio to detect sharp pluck transient
+        // 4096 samples (~93ms window) captures down to 28 Hz (Bass Low B) with rapid 43 fps refresh
+        const val BUFFER_SIZE = 4096
+        const val HOP_SIZE = 1024
+        private const val NOISE_FLOOR_RMS = 0.003 // Sensitive to soft acoustic plucks yet rejects ambient noise
+        private const val ATTACK_SPIKE_RMS_RATIO = 2.2 // Detect pluck strike
     }
 
     @SuppressLint("MissingPermission")
@@ -104,9 +103,8 @@ class PitchDetector {
             audioRecord?.startRecording()
             isRecording = true
 
-            // Reset smoothing filters
-            kalmanFrequency = 0.0
-            kalmanVariance = 1.0
+            // Reset stabilizer
+            stabilizer.reset()
             previousRms = 0.0
             lastPluckTimestamp = 0L
 
@@ -155,10 +153,9 @@ class PitchDetector {
                             val (rawFreq, confidence) = detectPitchMPM(linearWindow, BUFFER_SIZE, SAMPLE_RATE)
 
                             // Validate detected frequency range: 28Hz (sub-bass) to 1450Hz (high guitar frets)
-                            if (rawFreq in 28.0..1450.0 && confidence > 0.52) {
-                                // Apply pluck attack damping: if within 80ms of string strike, slightly lower confidence
-                                val timeSincePluck = now - lastPluckTimestamp
-                                val smoothedFreq = applyKalmanFilter(rawFreq, confidence, timeSincePluck < 85L)
+                            if (rawFreq in 28.0..1450.0 && confidence > 0.45) {
+                                val isAttackPhase = (now - lastPluckTimestamp) < 55L
+                                val smoothedFreq = stabilizer.update(rawFreq, confidence, isAttackPhase)
 
                                 val result = MusicalPitchHelper.frequencyToPitch(
                                     freq = smoothedFreq,
@@ -175,20 +172,9 @@ class PitchDetector {
                                 )
                             }
                         } else {
-                            // Silent / below noise floor -> decay Kalman
-                            kalmanFrequency = 0.0
-                            _pitchState.value = PitchResult(
-                                frequency = 0.0,
-                                noteName = "--",
-                                noteLetter = "-",
-                                octave = 0,
-                                targetFrequency = 0.0,
-                                centsDiff = 0.0,
-                                isInTune = false,
-                                isClose = false,
-                                amplitude = 0.0,
-                                confidence = 0.0
-                            )
+                            // Silent / below noise floor -> reset stabilizer
+                            stabilizer.reset()
+                            _pitchState.value = PitchResult.EMPTY
                         }
                     }
                 }
@@ -210,67 +196,118 @@ class PitchDetector {
             Log.e(TAG, "Error stopping audioRecord", e)
         }
         audioRecord = null
-        kalmanFrequency = 0.0
-        _pitchState.value = PitchResult(
-            frequency = 0.0,
-            noteName = "--",
-            noteLetter = "-",
-            octave = 0,
-            targetFrequency = 0.0,
-            centsDiff = 0.0,
-            isInTune = false,
-            isClose = false,
-            amplitude = 0.0,
-            confidence = 0.0
-        )
+        stabilizer.reset()
+        _pitchState.value = PitchResult.EMPTY
     }
 
     /**
-     * Adaptive 1D Kalman-like Filter for pitch stability:
-     * - Instant adaptation when frequency jumps (string change)
-     * - Ultra-smooth sub-cent stabilization when sustaining a string
-     * - Ignores sharp attack artifacts on first pick impact
+     * Pitch Stabilizer:
+     * - 3-point median filter to reject random outliers / single-frame pick noise
+     * - Fast-tracking when user turns tuning peg (> 15 cents movement)
+     * - Micro-jitter dampening (< 10 cents) when sustaining for rock-steady needle
+     * - Instant reset on note/string change (> 65 cents)
      */
-    private fun applyKalmanFilter(newFreq: Double, confidence: Double, isPluckAttack: Boolean): Double {
-        if (kalmanFrequency == 0.0 || abs(newFreq - kalmanFrequency) / kalmanFrequency > 0.08) {
-            // Note transition or string change: snap instantly without lag
-            kalmanFrequency = newFreq
-            kalmanVariance = 0.5
-            return newFreq
+    private class PitchStabilizer {
+        private val window = DoubleArray(3)
+        private var windowSize = 0
+        private var smoothedFreq = 0.0
+
+        fun update(newFreq: Double, confidence: Double, isAttack: Boolean): Double {
+            if (newFreq <= 20.0 || confidence < 0.45) {
+                reset()
+                return 0.0
+            }
+
+            // If pitch jumps by > 65 cents (different string/note), reset filter immediately
+            if (smoothedFreq > 0.0) {
+                val semitoneDiff = abs(1200.0 * kotlin.math.log2(newFreq / smoothedFreq))
+                if (semitoneDiff > 65.0) {
+                    reset()
+                    smoothedFreq = newFreq
+                    window[0] = newFreq
+                    windowSize = 1
+                    return newFreq
+                }
+            }
+
+            // 3-point median filter
+            if (windowSize < 3) {
+                window[windowSize++] = newFreq
+            } else {
+                window[0] = window[1]
+                window[1] = window[2]
+                window[2] = newFreq
+            }
+
+            val median = if (windowSize == 3) {
+                val a = window[0]
+                val b = window[1]
+                val c = window[2]
+                max(min(a, b), min(max(a, b), c))
+            } else {
+                newFreq
+            }
+
+            if (smoothedFreq <= 0.0) {
+                smoothedFreq = median
+                return median
+            }
+
+            val cents = abs(1200.0 * kotlin.math.log2(median / smoothedFreq))
+            smoothedFreq = when {
+                isAttack -> {
+                    // String strike attack transient: gentle blending to prevent needle kick
+                    0.60 * smoothedFreq + 0.40 * median
+                }
+                cents > 12.0 -> {
+                    // Tuning peg is actively turning: follow almost instantaneously (85% new)
+                    0.15 * smoothedFreq + 0.85 * median
+                }
+                else -> {
+                    // Holding steady near pitch: smooth micro-jitter (40% old / 60% new)
+                    0.40 * smoothedFreq + 0.60 * median
+                }
+            }
+
+            return smoothedFreq
         }
 
-        // Adaptive smoothing factor based on confidence & string sustain
-        val r = if (isPluckAttack) 0.35 else 0.82 // Stronger smoothing during steady sustain
-        val weight = r * confidence.coerceIn(0.5, 0.98)
-        kalmanFrequency = (kalmanFrequency * weight) + (newFreq * (1.0 - weight))
-        return kalmanFrequency
+        fun reset() {
+            windowSize = 0
+            smoothedFreq = 0.0
+        }
     }
 
     /**
-     * High-Precision McLeod Pitch Method (MPM)
-     * Normalized Square Difference Function (NSDF) with:
-     * 1. Multi-peak picking with peak thresholding (K = 0.85 * maxPeak)
-     * 2. Subharmonic overtone checker (prevents 2nd/3rd harmonic locks on wound guitar/bass strings)
-     * 3. Parabolic sub-sample interpolation for +/-0.1 cent resolution
+     * High-Precision Pitch Detection with:
+     * 1. O(1) sliding square normalization for ultra-fast NSDF calculation
+     * 2. Harmonic & Octave Disambiguation (eliminates 2nd/3rd harmonic locks on wound guitar strings)
+     * 3. Parabolic sub-sample peak interpolation for exact mathematical frequency (+/-0.1 cents)
      */
     fun detectPitchMPM(buffer: FloatArray, length: Int, sampleRate: Int): Pair<Double, Double> {
         val maxLag = length / 2
-        val minLag = sampleRate / 1450 // Up to 1450 Hz
+        val minLag = max(2, sampleRate / 1450) // Up to ~1450 Hz
         val lowestLag = min(sampleRate / 28, maxLag - 1) // Down to 28 Hz (Bass Low B0 / C1)
 
         val nsdf = FloatArray(lowestLag + 1)
 
-        // Compute Normalized Square Difference Function
+        // Precompute prefix sum of squares for O(1) normalization
+        val sqPrefix = DoubleArray(length + 1)
+        for (i in 0 until length) {
+            sqPrefix[i + 1] = sqPrefix[i] + (buffer[i] * buffer[i])
+        }
+
+        // Compute Normalized Square Difference Function with O(1) norm
         for (tau in 0..lowestLag) {
             var acf = 0.0f
-            var norm = 0.0f
             val limit = length - tau
             for (i in 0 until limit) {
-                val s1 = buffer[i]
-                val s2 = buffer[i + tau]
-                acf += s1 * s2
-                norm += (s1 * s1 + s2 * s2)
+                acf += buffer[i] * buffer[i + tau]
             }
+            // norm = sum(buffer[0..limit-1]^2) + sum(buffer[tau..length-1]^2)
+            val norm1 = sqPrefix[limit]
+            val norm2 = sqPrefix[length] - sqPrefix[tau]
+            val norm = (norm1 + norm2).toFloat()
             nsdf[tau] = if (norm > 0.0001f) (2.0f * acf) / norm else 0.0f
         }
 
@@ -284,7 +321,7 @@ class PitchDetector {
             val curr = nsdf[tau]
             val next = nsdf[tau + 1]
 
-            if (curr > 0.35f && curr > prev && curr >= next) {
+            if (curr > 0.30f && curr > prev && curr >= next) {
                 peaks.add(Peak(tau, curr))
                 if (curr > highestPeakVal) {
                     highestPeakVal = curr
@@ -292,17 +329,27 @@ class PitchDetector {
             }
         }
 
-        if (peaks.isEmpty() || highestPeakVal < 0.45f) {
+        if (peaks.isEmpty() || highestPeakVal < 0.40f) {
             return Pair(0.0, 0.0)
         }
 
-        // McLeod Pitch Method standard peak picking:
-        // Pick the first turning-point peak that exceeds the key threshold (e.g. 0.82 * highestPeakVal).
-        // In MPM, scanning from lowest lag (highest freq) to higher lag (lower freq), the FIRST prominent
-        // peak corresponds directly to the true fundamental period (T0), since higher harmonics would
-        // correspond to sub-periods (fractions of T0), and subharmonics occur at 2*T0, 3*T0 (which have lower or equal ACF).
-        val threshold = highestPeakVal * 0.85f
-        val chosenPeak = peaks.firstOrNull { it.value >= threshold } ?: peaks.maxByOrNull { it.value }!!
+        // 1. Find the highest peak in the NSDF
+        val maxPeak = peaks.maxByOrNull { it.value } ?: peaks.first()
+
+        // 2. Select first peak that achieves at least 90% of the maximum peak (MPM key threshold)
+        val threshold = highestPeakVal * 0.90f
+        val cand = peaks.firstOrNull { it.value >= threshold } ?: maxPeak
+
+        // 3. Harmonic Disambiguation:
+        // If cand is an overtone (e.g. 2nd harmonic of Low E or A), check whether a fundamental
+        // at ~2*cand.lag exists with noticeably higher correlation (+0.06).
+        // This prevents octave-doubling on wound strings without falsely doubling pure sines or treble notes.
+        val doubleLagPeak = peaks.firstOrNull { peak ->
+            val ratio = peak.lag.toFloat() / cand.lag
+            (ratio in 1.90f..2.10f) && peak.value > cand.value + 0.06f
+        }
+
+        val chosenPeak = doubleLagPeak ?: cand
 
         val peakLag = chosenPeak.lag
 
@@ -313,7 +360,7 @@ class PitchDetector {
         val denominator = 2.0f * (2.0f * beta - alpha - gamma)
 
         val delta = if (abs(denominator) > 0.00001f) {
-            (gamma - alpha) / denominator
+            ((gamma - alpha) / denominator).coerceIn(-0.5f, 0.5f)
         } else 0.0f
 
         val refinedLag = peakLag + delta.toDouble()

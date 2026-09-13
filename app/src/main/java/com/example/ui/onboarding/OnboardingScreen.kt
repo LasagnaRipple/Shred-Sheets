@@ -55,7 +55,6 @@ import com.example.model.AccentColor
 import com.example.model.AppSettings
 import com.example.model.ColorMode
 import com.example.model.InstrumentType
-import com.example.ui.components.AccentColorSwatchPicker
 import com.example.ui.components.InstrumentIcon
 
 @Composable
@@ -251,19 +250,6 @@ fun OnboardingScreen(
                         )
                     }
                 }
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                // Accent color swatches (with mode-based availability)
-                AccentColorSwatchPicker(
-                    selectedAccent = selectedAccent,
-                    isDark = isDark,
-                    onSelectAccent = { accent ->
-                        selectedAccent = accent
-                        onUpdateTheme(selectedColorMode, accent)
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                )
             }
         }
 

@@ -11,12 +11,15 @@ import android.view.HapticFeedbackConstants
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -45,6 +48,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -59,9 +64,9 @@ import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.VolumeDown
 import androidx.compose.material.icons.filled.VolumeMute
 import androidx.compose.material.icons.filled.VolumeOff
@@ -78,6 +83,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
@@ -104,10 +110,16 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
@@ -133,6 +145,7 @@ import kotlin.math.sin
 @Composable
 fun LoopStationScreen(
     viewModel: MainViewModel,
+    onThemeToggle: () -> Unit = { viewModel.toggleTheme() },
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -210,11 +223,14 @@ fun LoopStationScreen(
     val showHeadphoneTip by viewModel.loopStationEngine.showHeadphoneTip.collectAsState()
     val previewingTakeId by viewModel.loopStationEngine.previewingTakeId.collectAsState()
     val currentRecordingTakeNumber by viewModel.loopStationEngine.currentRecordingTakeNumber.collectAsState()
+    val exportTrackName by viewModel.exportTrackName.collectAsState()
+    val focusManager = LocalFocusManager.current
 
     val totalBars = 4
 
     // Dialog & Sheet States
     var showInfoDialog by remember { mutableStateOf(false) }
+    var showTimeSigDialog by remember { mutableStateOf(false) }
     var activeSheetTrackIndex by remember { mutableStateOf<Int?>(null) }
     var isExporting by remember { mutableStateOf(false) }
     var showBackingVolumePopup by remember { mutableStateOf(false) }
@@ -228,7 +244,10 @@ fun LoopStationScreen(
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // 1. Header: "Loop station", Guide Info Icon
+        // 1. Header: "Loop station", Guide Info Icon (tap title to cycle accent)
+        val titleScale = remember { Animatable(1f) }
+        val titleScope = rememberCoroutineScope()
+
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -237,16 +256,43 @@ fun LoopStationScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Loop Station",
-                    style = MaterialTheme.typography.headlineLarge.copy(
-                        fontWeight = FontWeight.Black,
-                        fontSize = 32.sp,
-                        lineHeight = 36.sp,
-                        letterSpacing = (-0.5).sp
-                    ),
-                    color = activeAccentColor
-                )
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            titleScope.launch {
+                                titleScale.animateTo(0.90f, animationSpec = tween(70))
+                                titleScale.animateTo(
+                                    1f,
+                                    animationSpec = spring(
+                                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                                        stiffness = Spring.StiffnessMedium
+                                    )
+                                )
+                            }
+                            onThemeToggle()
+                        }
+                        .padding(horizontal = 4.dp, vertical = 2.dp)
+                        .semantics {
+                            role = Role.Button
+                            contentDescription = "Loop Station title. Tap to cycle accent color theme."
+                        }
+                        .testTag("header_loop_station_title"),
+                    contentAlignment = Alignment.CenterStart
+                ) {
+                    Text(
+                        text = "Loop Station",
+                        style = MaterialTheme.typography.headlineLarge.copy(
+                            fontWeight = FontWeight.Black,
+                            fontSize = 32.sp,
+                            lineHeight = 36.sp,
+                            letterSpacing = (-0.5).sp
+                        ),
+                        color = activeAccentColor,
+                        modifier = Modifier.scale(titleScale.value)
+                    )
+                }
             }
 
             IconButton(
@@ -264,60 +310,7 @@ fun LoopStationScreen(
             }
         }
 
-        // 2. Headphone Tip Banner (Dismissible)
-        AnimatedVisibility(
-            visible = showHeadphoneTip,
-            enter = fadeIn() + expandVertically(),
-            exit = fadeOut() + shrinkVertically()
-        ) {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 12.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .border(1.dp, activeAccentColor.copy(alpha = 0.5f), RoundedCornerShape(12.dp)),
-                colors = CardDefaults.cardColors(
-                    containerColor = activeAccentColor.copy(alpha = 0.12f)
-                )
-            ) {
-                Row(
-                    modifier = Modifier.padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Headphones,
-                        contentDescription = "Headphones recommended",
-                        tint = activeAccentColor,
-                        modifier = Modifier.size(22.dp)
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text(
-                        text = "For clean multi-track recording without speaker bleed, headphones are recommended.",
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            fontSize = 12.sp,
-                            lineHeight = 16.sp
-                        ),
-                        color = if (isDark) Color.White else MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.weight(1f)
-                    )
-                    IconButton(
-                        onClick = {
-                            viewModel.dismissHeadphoneTip()
-                        },
-                        modifier = Modifier.size(24.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "Dismiss tip",
-                            tint = if (isDark) Color(0xFF94A3B8) else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-                }
-            }
-        }
-
-        // Title: SETUP YOUR BEAT (outside component, matching TRACKS)
+        // Title: SETUP YOUR BEAT (outside component)
         Text(
             text = "SETUP YOUR BEAT",
             style = MaterialTheme.typography.labelSmall.copy(
@@ -435,10 +428,11 @@ fun LoopStationScreen(
                                 .testTag("loop_backing_volume_button"),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
+                            val isVolumeActive = (backingVolume * 100).roundToInt() > 0
                             Icon(
-                                imageVector = if (backingVolume <= 0.01f) Icons.Default.VolumeMute else if (backingVolume < 0.5f) Icons.Default.VolumeDown else Icons.Default.VolumeUp,
+                                imageVector = if (!isVolumeActive) Icons.Default.VolumeMute else if (backingVolume < 0.5f) Icons.Default.VolumeDown else Icons.Default.VolumeUp,
                                 contentDescription = "Backing volume",
-                                tint = if (showBackingVolumePopup) activeAccentColor else if (isDark) Color(0xFF94A3B8) else MaterialTheme.colorScheme.onSurfaceVariant,
+                                tint = if (isVolumeActive || showBackingVolumePopup) activeAccentColor else if (isDark) Color(0xFF94A3B8) else MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(16.dp)
                             )
                             Spacer(modifier = Modifier.width(6.dp))
@@ -589,10 +583,11 @@ fun LoopStationScreen(
 
                                         Spacer(modifier = Modifier.height(6.dp))
 
+                                        val isPopupVolumeActive = (backingVolume * 100).roundToInt() > 0
                                         Icon(
-                                            imageVector = Icons.Default.VolumeDown,
+                                            imageVector = if (!isPopupVolumeActive) Icons.Default.VolumeMute else if (backingVolume < 0.5f) Icons.Default.VolumeDown else Icons.Default.VolumeUp,
                                             contentDescription = null,
-                                            tint = if (isDark) Color(0xFF94A3B8) else MaterialTheme.colorScheme.onSurfaceVariant,
+                                            tint = if (isPopupVolumeActive) activeAccentColor else if (isDark) Color(0xFF94A3B8) else MaterialTheme.colorScheme.onSurfaceVariant,
                                             modifier = Modifier.size(16.dp)
                                         )
                                     }
@@ -634,9 +629,35 @@ fun LoopStationScreen(
                         )
                     }
 
-                    // BPM Counter & Subtitle (Beats per min) - strictly re-using MetronomeScreen typography
+                    // BPM Counter & Subtitle (Beats per min) - Tap in quick succession to set tempo
+                    val tapTempoScale = remember { Animatable(1f) }
+                    val tapTempoScope = rememberCoroutineScope()
+
                     Column(
-                        horizontalAlignment = Alignment.CenterHorizontally
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable {
+                                triggerStrongTick()
+                                tapTempoScope.launch {
+                                    tapTempoScale.animateTo(0.92f, animationSpec = tween(50))
+                                    tapTempoScale.animateTo(
+                                        1f,
+                                        animationSpec = spring(
+                                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                                            stiffness = Spring.StiffnessMedium
+                                        )
+                                    )
+                                }
+                                viewModel.tapTempo()
+                            }
+                            .padding(horizontal = 12.dp, vertical = 4.dp)
+                            .scale(tapTempoScale.value)
+                            .semantics {
+                                role = Role.Button
+                                contentDescription = "Tempo $bpm beats per minute. Tap repeatedly to set tempo."
+                            }
+                            .testTag("loop_tap_tempo_area")
                     ) {
                         Text(
                             text = "$bpm",
@@ -784,98 +805,155 @@ fun LoopStationScreen(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // Row 4: Centered Play/Stop Button
-                Box(
+                // Row 4: BAR feature (left), Reduced Play/Stop Button (center), Time Signature feature (right)
+                val timeSigLabel = when (timeSignature) {
+                    2 -> "2/4"
+                    3 -> "3/4"
+                    4 -> "4/4"
+                    6 -> "6/8"
+                    else -> "$timeSignature/4"
+                }
+
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                    contentAlignment = Alignment.Center
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
+                    // Left: BAR indicator dots
                     Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(999.dp))
-                            .background(if (isPlaying) activeAccentColor else activeAccentColor.copy(alpha = 0.15f))
-                            .border(
-                                1.5.dp,
-                                if (isPlaying) activeAccentColor else activeAccentColor.copy(alpha = 0.6f),
-                                RoundedCornerShape(999.dp)
-                            )
-                            .clickable {
-                                triggerStrongTick()
-                                viewModel.toggleMetronome()
-                            }
-                            .padding(horizontal = 22.dp, vertical = 9.dp)
-                            .testTag("loop_backing_play_button"),
-                        contentAlignment = Alignment.Center
+                        modifier = Modifier.weight(1f),
+                        contentAlignment = Alignment.CenterStart
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                contentDescription = if (isPlaying) "Stop" else "Play",
-                                tint = if (isPlaying) MaterialTheme.colorScheme.onPrimary else activeAccentColor,
-                                modifier = Modifier.size(20.dp)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.testTag("loop_bar_indicator")
+                        ) {
+                            Text(
+                                text = "BAR",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 10.sp,
+                                    letterSpacing = 1.sp
+                                ),
+                                color = if (isDark) Color(0xFF94A3B8) else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = if (isPlaying) "Stop" else "Play",
-                                style = MaterialTheme.typography.labelMedium.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 14.sp
-                                ),
-                                color = if (isPlaying) MaterialTheme.colorScheme.onPrimary else activeAccentColor
+
+                            for (bar in 0 until totalBars) {
+                                val isCurrentBar = isPlaying && (currentBarIndex == bar)
+                                val isPastBar = isPlaying && (bar < currentBarIndex)
+
+                                val dotColor by animateColorAsState(
+                                    targetValue = when {
+                                        isCurrentBar -> activeAccentColor
+                                        isPastBar -> activeAccentColor.copy(alpha = 0.7f)
+                                        else -> if (isDark) Color(0xFF475569) else MaterialTheme.colorScheme.outlineVariant
+                                    },
+                                    animationSpec = tween(120),
+                                    label = "loopDotColor"
+                                )
+
+                                val dotSize by animateFloatAsState(
+                                    targetValue = if (isCurrentBar) 11f else 7f,
+                                    animationSpec = tween(120),
+                                    label = "loopDotSize"
+                                )
+
+                                Box(
+                                    modifier = Modifier
+                                        .padding(horizontal = 3.dp)
+                                        .size(dotSize.dp)
+                                        .clip(CircleShape)
+                                        .background(dotColor)
+                                        .then(
+                                            if (isCurrentBar) Modifier.border(1.5.dp, Color.White, CircleShape)
+                                            else Modifier
+                                        )
+                                )
+                            }
+                        }
+                    }
+
+                    // Center: Reduced Play/Stop Button (icon only)
+                    Box(
+                        modifier = Modifier.weight(1f),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(46.dp)
+                                .clip(CircleShape)
+                                .background(if (isPlaying) activeAccentColor else activeAccentColor.copy(alpha = 0.15f))
+                                .border(
+                                    1.5.dp,
+                                    if (isPlaying) activeAccentColor else activeAccentColor.copy(alpha = 0.6f),
+                                    CircleShape
+                                )
+                                .clickable {
+                                    triggerStrongTick()
+                                    viewModel.toggleMetronome()
+                                }
+                                .testTag("loop_backing_play_button"),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = if (isPlaying) Icons.Default.Stop else Icons.Default.PlayArrow,
+                                contentDescription = if (isPlaying) "Stop" else "Play",
+                                tint = if (isPlaying) MaterialTheme.colorScheme.onPrimary else activeAccentColor,
+                                modifier = Modifier.size(24.dp)
                             )
                         }
                     }
-                }
 
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // Row 5: Centered BAR O O O O position indicator dots below Play Beat
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "BAR",
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 10.sp,
-                            letterSpacing = 1.sp
-                        ),
-                        color = if (isDark) Color(0xFF94A3B8) else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-
-                    for (bar in 0 until totalBars) {
-                        val isCurrentBar = isPlaying && (currentBarIndex == bar)
-                        val isPastBar = isPlaying && (bar < currentBarIndex)
-
-                        val dotColor by animateColorAsState(
-                            targetValue = when {
-                                isCurrentBar -> activeAccentColor
-                                isPastBar -> activeAccentColor.copy(alpha = 0.7f)
-                                else -> if (isDark) Color(0xFF475569) else MaterialTheme.colorScheme.outlineVariant
-                            },
-                            animationSpec = tween(120),
-                            label = "loopDotColor"
-                        )
-
-                        val dotSize by animateFloatAsState(
-                            targetValue = if (isCurrentBar) 12f else 8f,
-                            animationSpec = tween(120),
-                            label = "loopDotSize"
-                        )
-
-                        Box(
+                    // Right: Time Signature Feature from Metronome Section
+                    Box(
+                        modifier = Modifier.weight(1f),
+                        contentAlignment = Alignment.CenterEnd
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
                             modifier = Modifier
-                                .padding(horizontal = 4.dp)
-                                .size(dotSize.dp)
-                                .clip(CircleShape)
-                                .background(dotColor)
-                                .then(
-                                    if (isCurrentBar) Modifier.border(1.5.dp, Color.White, CircleShape)
-                                    else Modifier
+                                .clip(RoundedCornerShape(16.dp))
+                                .clickable {
+                                    triggerStrongTick()
+                                    showTimeSigDialog = true
+                                }
+                                .padding(vertical = 2.dp, horizontal = 2.dp)
+                                .semantics {
+                                    role = Role.Button
+                                    contentDescription = "Time signature $timeSigLabel. Tap to change."
+                                }
+                                .testTag("loop_time_signature_button")
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(20.dp))
+                                    .background(if (isDark) Color.Transparent else MaterialTheme.colorScheme.surfaceVariant)
+                                    .border(1.5.dp, activeAccentColor, RoundedCornerShape(20.dp))
+                                    .padding(horizontal = 14.dp, vertical = 5.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = timeSigLabel,
+                                    style = MaterialTheme.typography.titleSmall.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp
+                                    ),
+                                    color = if (isDark) Color.White else MaterialTheme.colorScheme.onSurface
                                 )
-                        )
+                            }
+
+                            Spacer(modifier = Modifier.height(2.dp))
+
+                            Text(
+                                text = "Time signature",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Normal
+                                ),
+                                color = if (isDark) Color(0xFF9CA3AF) else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
             }
@@ -885,7 +963,7 @@ fun LoopStationScreen(
 
         // 5. Two Track Pads (Track 1, Track 2)
         Text(
-            text = "TRACKS",
+            text = "Record tracks",
             style = MaterialTheme.typography.labelSmall.copy(
                 fontWeight = FontWeight.Bold,
                 fontSize = 11.sp,
@@ -896,6 +974,59 @@ fun LoopStationScreen(
                 .fillMaxWidth()
                 .padding(start = 4.dp, bottom = 8.dp)
         )
+
+        // Headphone Tip Banner (Dismissible) - Recommended for recording tracks
+        AnimatedVisibility(
+            visible = showHeadphoneTip,
+            enter = fadeIn() + expandVertically(),
+            exit = fadeOut() + shrinkVertically()
+        ) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 12.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .border(1.dp, activeAccentColor.copy(alpha = 0.5f), RoundedCornerShape(12.dp)),
+                colors = CardDefaults.cardColors(
+                    containerColor = activeAccentColor.copy(alpha = 0.12f)
+                )
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Headphones,
+                        contentDescription = "Headphones recommended",
+                        tint = activeAccentColor,
+                        modifier = Modifier.size(22.dp)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = "For clean multi-track recording without speaker bleed, headphones are recommended.",
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontSize = 12.sp,
+                            lineHeight = 16.sp
+                        ),
+                        color = if (isDark) Color.White else MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.weight(1f)
+                    )
+                    IconButton(
+                        onClick = {
+                            viewModel.dismissHeadphoneTip()
+                        },
+                        modifier = Modifier.size(24.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Dismiss tip",
+                            tint = if (isDark) Color(0xFF94A3B8) else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+            }
+        }
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -944,7 +1075,21 @@ fun LoopStationScreen(
 
         Spacer(modifier = Modifier.height(18.dp))
 
-        // 6. Export Mix Card
+        // 6. Export Mix Section Header
+        Text(
+            text = "EXPORT MIX",
+            style = MaterialTheme.typography.labelSmall.copy(
+                fontWeight = FontWeight.Bold,
+                fontSize = 11.sp,
+                letterSpacing = 1.sp
+            ),
+            color = if (isDark) Color(0xFF94A3B8) else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 4.dp, bottom = 8.dp)
+        )
+
+        // Export Mix Card
         Card(
             modifier = Modifier
                 .fillMaxWidth()
@@ -953,28 +1098,43 @@ fun LoopStationScreen(
             colors = CardDefaults.cardColors(containerColor = cardBg)
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.MusicNote,
-                        contentDescription = "Export Mix",
-                        tint = activeAccentColor,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Export Mix",
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp
-                        ),
-                        color = if (isDark) Color.White else MaterialTheme.colorScheme.onSurface
-                    )
-                }
+                // Editable Track Name field (defines file name saved to device; defaults to "My track #1")
+                OutlinedTextField(
+                    value = exportTrackName,
+                    onValueChange = { viewModel.setExportTrackName(it) },
+                    label = { Text("Track Name") },
+                    placeholder = { Text("My track #1") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("export_track_name_input"),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = activeAccentColor,
+                        unfocusedBorderColor = cardBorder,
+                        focusedLabelColor = activeAccentColor,
+                        unfocusedLabelColor = if (isDark) Color(0xFF94A3B8) else MaterialTheme.colorScheme.onSurfaceVariant,
+                        focusedTextColor = if (isDark) Color.White else MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = if (isDark) Color.White else MaterialTheme.colorScheme.onSurface,
+                        cursorColor = activeAccentColor
+                    ),
+                    trailingIcon = {
+                        if (exportTrackName.isNotEmpty()) {
+                            IconButton(onClick = { viewModel.setExportTrackName("") }) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Clear track name",
+                                    tint = if (isDark) Color(0xFF94A3B8) else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                    }
+                )
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
                 // Summary of included streams
                 Column(
@@ -1012,11 +1172,12 @@ fun LoopStationScreen(
                 ) {
                     Button(
                         onClick = {
+                            focusManager.clearFocus()
                             scope.launch {
                                 try {
                                     isExporting = true
-                                    val file = viewModel.bounceMix()
-                                    Toast.makeText(context, "Mix saved: ${file.name}", Toast.LENGTH_SHORT).show()
+                                    val file = viewModel.bounceMix(exportTrackName)
+                                    Toast.makeText(context, "Saved to device: ${file.name}", Toast.LENGTH_SHORT).show()
                                 } catch (e: Exception) {
                                     Toast.makeText(context, "Export error: ${e.message}", Toast.LENGTH_SHORT).show()
                                 } finally {
@@ -1041,10 +1202,11 @@ fun LoopStationScreen(
 
                     Button(
                         onClick = {
+                            focusManager.clearFocus()
                             scope.launch {
                                 try {
                                     isExporting = true
-                                    val file = viewModel.bounceMix()
+                                    val file = viewModel.bounceMix(exportTrackName)
                                     val uri = FileProvider.getUriForFile(
                                         context,
                                         "${context.packageName}.fileprovider",
@@ -1055,7 +1217,7 @@ fun LoopStationScreen(
                                         putExtra(Intent.EXTRA_STREAM, uri)
                                         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                     }
-                                    context.startActivity(Intent.createChooser(shareIntent, "Share Shred Sheets Mix"))
+                                    context.startActivity(Intent.createChooser(shareIntent, "Share ${file.name}"))
                                 } catch (e: Exception) {
                                     Toast.makeText(context, "Share error: ${e.message}", Toast.LENGTH_SHORT).show()
                                 } finally {
@@ -1110,35 +1272,11 @@ fun LoopStationScreen(
                 onSelectActive = { takeId ->
                     viewModel.setActiveTake(trackIdx, takeId)
                 },
-                onRename = { takeId, newName ->
-                    viewModel.updateTakeName(trackIdx, takeId, newName)
-                },
-                onUpdateNotes = { takeId, notes ->
-                    viewModel.updateTakeNotes(trackIdx, takeId, notes)
-                },
                 onDelete = { takeId ->
                     viewModel.deleteTake(trackIdx, takeId)
                 },
                 onPreview = { take ->
                     viewModel.previewTake(take)
-                },
-                onShare = { take ->
-                    try {
-                        val file = File(take.audioFilePath)
-                        val uri = FileProvider.getUriForFile(
-                            context,
-                            "${context.packageName}.fileprovider",
-                            file
-                        )
-                        val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                            type = "audio/wav"
-                            putExtra(Intent.EXTRA_STREAM, uri)
-                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                        }
-                        context.startActivity(Intent.createChooser(shareIntent, "Share ${take.name}"))
-                    } catch (e: Exception) {
-                        Toast.makeText(context, "Share failed: ${e.message}", Toast.LENGTH_SHORT).show()
-                    }
                 }
             )
         }
@@ -1192,6 +1330,67 @@ fun LoopStationScreen(
             confirmButton = {
                 Button(onClick = { showInfoDialog = false }) {
                     Text("Got It")
+                }
+            }
+        )
+    }
+
+    // 4. Time Signature Selection Dialog
+    if (showTimeSigDialog) {
+        val signatures = listOf(2 to "2/4", 3 to "3/4", 4 to "4/4", 6 to "6/8")
+        AlertDialog(
+            onDismissRequest = { showTimeSigDialog = false },
+            containerColor = if (isDark) cardBg else MaterialTheme.colorScheme.surface,
+            title = {
+                Text(
+                    text = "Select Time Signature",
+                    color = if (isDark) Color.White else MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    signatures.forEach { (beats, label) ->
+                        val isSelected = timeSignature == beats
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(
+                                    if (isSelected) activeAccentColor.copy(alpha = 0.15f)
+                                    else if (isDark) Color(0xFF0F172A) else MaterialTheme.colorScheme.surfaceVariant
+                                )
+                                .border(
+                                    1.5.dp,
+                                    if (isSelected) activeAccentColor
+                                    else if (isDark) cardBorder else MaterialTheme.colorScheme.outlineVariant,
+                                    RoundedCornerShape(12.dp)
+                                )
+                                .clickable {
+                                    triggerStrongTick()
+                                    viewModel.setMetronomeTimeSignature(beats)
+                                    showTimeSigDialog = false
+                                }
+                                .padding(vertical = 14.dp, horizontal = 16.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = label,
+                                style = MaterialTheme.typography.titleMedium.copy(
+                                    fontWeight = FontWeight.Bold
+                                ),
+                                color = if (isSelected) activeAccentColor else if (isDark) Color.White else MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showTimeSigDialog = false }) {
+                    Text("Cancel", color = activeAccentColor)
                 }
             }
         )
@@ -1492,6 +1691,14 @@ private fun TrackPadColumn(
                                 ),
                                 color = Color.White
                             )
+                            Text(
+                                text = "STOP",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 8.5.sp
+                                ),
+                                color = if (isDark) Color(0xFF94A3B8) else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                         isArmed -> {
                             Text(
@@ -1529,28 +1736,32 @@ private fun TrackPadColumn(
                                 overflow = TextOverflow.Ellipsis
                             )
                             Text(
-                                text = if (track.isPlaybackEnabled) "IN MIX" else "MUTED",
+                                text = if (track.isPlaybackEnabled) "IN MIX" else "Start Recording",
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     fontWeight = FontWeight.Bold,
-                                    fontSize = 8.5.sp
+                                    fontSize = 8.sp,
+                                    textAlign = TextAlign.Center
                                 ),
-                                color = if (track.isPlaybackEnabled) emeraldPlayingColor else if (isDark) Color(0xFF94A3B8) else MaterialTheme.colorScheme.onSurfaceVariant
+                                color = if (track.isPlaybackEnabled) emeraldPlayingColor else if (isDark) Color(0xFF94A3B8) else MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1
                             )
                         }
                         else -> {
                             Icon(
                                 imageVector = Icons.Default.Mic,
-                                contentDescription = "Tap to record",
+                                contentDescription = "Start recording",
                                 tint = if (isDark) Color(0xFF94A3B8) else MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(20.dp)
                             )
                             Text(
-                                text = "Tap",
+                                text = "Start Recording",
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     fontWeight = FontWeight.Medium,
-                                    fontSize = 10.sp
+                                    fontSize = 8.5.sp,
+                                    textAlign = TextAlign.Center
                                 ),
-                                color = if (isDark) Color(0xFF94A3B8) else MaterialTheme.colorScheme.onSurfaceVariant
+                                color = if (isDark) Color(0xFF94A3B8) else MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1
                             )
                         }
                     }
@@ -1582,13 +1793,14 @@ private fun TrackPadColumn(
                         )
                     }
 
-                    // Badge: Take X/Y
+                    // Badge: Take X/Y (Tap to open takes sheet)
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(6.dp))
                             .background(if (isDark) Color(0xFF0F172A) else MaterialTheme.colorScheme.surface)
                             .clickable { onOpenTakesSheet() }
                             .padding(horizontal = 6.dp, vertical = 2.dp)
+                            .testTag("track_${trackIndex + 1}_takes_list_button")
                     ) {
                         Text(
                             text = "$currentTakeIndex/$totalTakes",
@@ -1620,21 +1832,6 @@ private fun TrackPadColumn(
                         color = if (isDark) Color(0xFF64748B) else MaterialTheme.colorScheme.outline
                     ),
                     modifier = Modifier.padding(vertical = 4.dp)
-                )
-            }
-
-            // Takes sheet icon button
-            IconButton(
-                onClick = { onOpenTakesSheet() },
-                modifier = Modifier
-                    .size(28.dp)
-                    .testTag("track_${trackIndex + 1}_takes_list_button")
-            ) {
-                Icon(
-                    imageVector = Icons.Default.QueueMusic,
-                    contentDescription = "Takes list",
-                    tint = activeAccentColor,
-                    modifier = Modifier.size(16.dp)
                 )
             }
 
@@ -1679,18 +1876,10 @@ private fun TakesBottomSheet(
     isDark: Boolean,
     onDismiss: () -> Unit,
     onSelectActive: (String) -> Unit,
-    onRename: (String, String) -> Unit,
-    onUpdateNotes: (String, String) -> Unit,
     onDelete: (String) -> Unit,
-    onPreview: (LoopTake) -> Unit,
-    onShare: (LoopTake) -> Unit
+    onPreview: (LoopTake) -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-
-    var renameTargetTake by remember { mutableStateOf<LoopTake?>(null) }
-    var renameText by remember { mutableStateOf("") }
-    var notesTargetTake by remember { mutableStateOf<LoopTake?>(null) }
-    var notesText by remember { mutableStateOf("") }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -1776,7 +1965,7 @@ private fun TakesBottomSheet(
                                 containerColor = if (isDark) Color(0xFF1E293B) else MaterialTheme.colorScheme.surfaceVariant
                             )
                         ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
+                            Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     verticalAlignment = Alignment.CenterVertically
@@ -1799,47 +1988,18 @@ private fun TakesBottomSheet(
 
                                     Spacer(modifier = Modifier.width(10.dp))
 
-                                    // Take name & notes summary
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Text(
-                                                text = take.name,
-                                                style = MaterialTheme.typography.titleSmall.copy(
-                                                    fontWeight = FontWeight.Bold,
-                                                    fontSize = 14.sp
-                                                ),
-                                                color = if (isDark) Color.White else MaterialTheme.colorScheme.onSurface
-                                            )
-                                            IconButton(
-                                                onClick = {
-                                                    renameTargetTake = take
-                                                    renameText = take.name
-                                                },
-                                                modifier = Modifier.size(20.dp)
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Default.Edit,
-                                                    contentDescription = "Rename take",
-                                                    tint = activeAccentColor,
-                                                    modifier = Modifier.size(12.dp)
-                                                )
-                                            }
-                                        }
+                                    // Take name (without rename pencil or notes)
+                                    Text(
+                                        text = take.name,
+                                        style = MaterialTheme.typography.titleSmall.copy(
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 14.sp
+                                        ),
+                                        color = if (isDark) Color.White else MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.weight(1f)
+                                    )
 
-                                        if (take.notes.isNotBlank()) {
-                                            Text(
-                                                text = take.notes,
-                                                style = MaterialTheme.typography.bodySmall.copy(
-                                                    fontSize = 11.sp,
-                                                    color = if (isDark) Color(0xFF94A3B8) else MaterialTheme.colorScheme.onSurfaceVariant
-                                                ),
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis
-                                            )
-                                        }
-                                    }
-
-                                    // Radio button to select as active
+                                    // Pill button to select as active
                                     Box(
                                         modifier = Modifier
                                             .clip(RoundedCornerShape(999.dp))
@@ -1873,6 +2033,21 @@ private fun TakesBottomSheet(
                                             )
                                         }
                                     }
+
+                                    Spacer(modifier = Modifier.width(4.dp))
+
+                                    // Delete icon moved next to selected / active
+                                    IconButton(
+                                        onClick = { onDelete(take.id) },
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Delete,
+                                            contentDescription = "Delete take",
+                                            tint = if (isDark) Color(0xFF94A3B8) else MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
                                 }
 
                                 Spacer(modifier = Modifier.height(8.dp))
@@ -1888,121 +2063,12 @@ private fun TakesBottomSheet(
                                         .background(if (isDark) Color(0xFF0F172A) else Color(0xFFE2E8F0))
                                         .padding(horizontal = 6.dp, vertical = 2.dp)
                                 )
-
-                                Spacer(modifier = Modifier.height(6.dp))
-
-                                // Actions row: Notes, Share, Delete
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.End,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    TextButton(
-                                        onClick = {
-                                            notesTargetTake = take
-                                            notesText = take.notes
-                                        }
-                                    ) {
-                                        Text(
-                                            text = if (take.notes.isBlank()) "+ Add Notes" else "Edit Notes",
-                                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp)
-                                        )
-                                    }
-
-                                    IconButton(
-                                        onClick = { onShare(take) },
-                                        modifier = Modifier.size(28.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Share,
-                                            contentDescription = "Share take",
-                                            tint = activeAccentColor,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                    }
-
-                                    IconButton(
-                                        onClick = { onDelete(take.id) },
-                                        modifier = Modifier.size(28.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Delete,
-                                            contentDescription = "Delete take",
-                                            tint = MaterialTheme.colorScheme.error,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                    }
-                                }
                             }
                         }
                     }
                 }
             }
         }
-    }
-
-    // Rename dialog
-    if (renameTargetTake != null) {
-        AlertDialog(
-            onDismissRequest = { renameTargetTake = null },
-            title = { Text("Rename Take", fontWeight = FontWeight.Bold) },
-            text = {
-                OutlinedTextField(
-                    value = renameText,
-                    onValueChange = { renameText = it },
-                    singleLine = true,
-                    label = { Text("Take Name") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        renameTargetTake?.let { onRename(it.id, renameText) }
-                        renameTargetTake = null
-                    }
-                ) {
-                    Text("Save")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { renameTargetTake = null }) {
-                    Text("Cancel")
-                }
-            }
-        )
-    }
-
-    // Notes dialog
-    if (notesTargetTake != null) {
-        AlertDialog(
-            onDismissRequest = { notesTargetTake = null },
-            title = { Text("Take Notes", fontWeight = FontWeight.Bold) },
-            text = {
-                OutlinedTextField(
-                    value = notesText,
-                    onValueChange = { notesText = it },
-                    maxLines = 4,
-                    label = { Text("Musical notes / chords used") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        notesTargetTake?.let { onUpdateNotes(it.id, notesText) }
-                        notesTargetTake = null
-                    }
-                ) {
-                    Text("Save")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { notesTargetTake = null }) {
-                    Text("Cancel")
-                }
-            }
-        )
     }
 }
 

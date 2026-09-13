@@ -47,6 +47,7 @@ import com.example.model.InstrumentString
 import com.example.model.InstrumentType
 import com.example.model.PitchResult
 import com.example.model.TuningMode
+import com.example.ui.components.DiceRollButton
 import com.example.ui.components.PitchMeter
 import com.example.ui.components.RockHeader
 import com.example.ui.components.ShakaVisualizer
@@ -253,23 +254,10 @@ fun TunerScreen(
 
                 Spacer(modifier = Modifier.width(8.dp))
 
-                // Interactive Dice button to cycle through anagrams (standalone emoji)
-                Box(
-                    modifier = Modifier
-                        .size(42.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .clickable {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            onCycleAnagram()
-                        }
-                        .testTag("cycle_anagram_dice_button"),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "🎲",
-                        fontSize = 22.sp
-                    )
-                }
+                // Interactive Dice button to cycle through anagrams with physical roll animation and synced haptics
+                DiceRollButton(
+                    onClick = onCycleAnagram
+                )
             }
         }
 

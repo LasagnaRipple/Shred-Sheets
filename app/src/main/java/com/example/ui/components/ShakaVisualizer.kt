@@ -42,6 +42,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -108,7 +111,7 @@ fun ShakaVisualizer(
         } else {
             val cents = pitchResult.centsDiff
             when {
-                kotlin.math.abs(cents) <= 5.0 -> CircleTunerState.PERFECT
+                kotlin.math.abs(cents) <= com.example.model.MusicalPitchHelper.IN_TUNE_TOLERANCE_CENTS -> CircleTunerState.PERFECT
                 cents < -15.0 -> CircleTunerState.FLAT
                 cents > 15.0 -> CircleTunerState.SHARP
                 cents < 0.0 -> CircleTunerState.CLOSE_FLAT
@@ -117,16 +120,11 @@ fun ShakaVisualizer(
         }
     }
 
-    // Debounce state changes by ~150ms of stable reading to prevent jitter
+    // Direct, responsive state updates without artificial lag
     var debouncedState by remember { mutableStateOf(rawState) }
 
     LaunchedEffect(rawState) {
-        if (rawState == CircleTunerState.READY) {
-            debouncedState = CircleTunerState.READY
-        } else {
-            delay(150)
-            debouncedState = rawState
-        }
+        debouncedState = rawState
     }
 
     // Light haptic tick when entering the perfect zone (distinct from the confirmed lock-in double-pulse)
@@ -302,27 +300,49 @@ fun ShakaVisualizer(
                 .testTag("shaka_visualizer_canvas"),
             contentAlignment = Alignment.Center
         ) {
-            // Subtle glow behind pulsating tuner 'play circle' in user selected accent color (matching chord page finger glow)
+            // Strong, vibrant neon glow behind pulsating tuner 'play circle' in user selected accent color
             val glowColor = accentColor
             if (debouncedState == CircleTunerState.READY) {
-                Canvas(modifier = Modifier.size(outerBoxSize)) {
+                Canvas(modifier = Modifier.size(240.dp)) {
                     val innerRadius = (circleDiameter.toPx() / 2f) * effectiveCircleScale
-                    val glowSpread = 30.dp.toPx() * idlePulseScale
-                    val outerRadius = innerRadius + glowSpread
+                    val wideSpread = 44.dp.toPx() * idlePulseScale
+                    val wideOuterRadius = innerRadius + wideSpread
+                    val wideInnerRatio = (innerRadius / wideOuterRadius).coerceIn(0.4f, 0.75f)
 
-                    // Radial glow extending outward from behind the play circle
+                    // Layer 1: Wide atmospheric neon glow radiating outward
                     drawCircle(
                         brush = Brush.radialGradient(
-                            colors = listOf(
-                                glowColor.copy(alpha = 0.55f),
-                                glowColor.copy(alpha = 0.28f),
-                                glowColor.copy(alpha = 0.08f),
-                                Color.Transparent
+                            colorStops = arrayOf(
+                                0.0f to glowColor.copy(alpha = 0.90f),
+                                wideInnerRatio to glowColor.copy(alpha = 0.85f),
+                                wideInnerRatio + (1f - wideInnerRatio) * 0.35f to glowColor.copy(alpha = 0.45f),
+                                wideInnerRatio + (1f - wideInnerRatio) * 0.70f to glowColor.copy(alpha = 0.18f),
+                                1.0f to Color.Transparent
                             ),
                             center = center,
-                            radius = outerRadius
+                            radius = wideOuterRadius
                         ),
-                        radius = outerRadius,
+                        radius = wideOuterRadius,
+                        center = center
+                    )
+
+                    // Layer 2: Intense core halo hugging the circular border
+                    val coreSpread = 16.dp.toPx() * idlePulseScale
+                    val coreOuterRadius = innerRadius + coreSpread
+                    val coreInnerRatio = (innerRadius / coreOuterRadius).coerceIn(0.5f, 0.85f)
+
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colorStops = arrayOf(
+                                0.0f to glowColor.copy(alpha = 0.95f),
+                                coreInnerRatio to glowColor.copy(alpha = 0.92f),
+                                coreInnerRatio + (1f - coreInnerRatio) * 0.50f to glowColor.copy(alpha = 0.50f),
+                                1.0f to Color.Transparent
+                            ),
+                            center = center,
+                            radius = coreOuterRadius
+                        ),
+                        radius = coreOuterRadius,
                         center = center
                     )
                 }
@@ -392,18 +412,10 @@ fun ShakaVisualizer(
                 ) { state ->
                     when (state) {
                         CircleTunerState.READY -> {
-                            // Play / idle icon
-                            Canvas(modifier = Modifier.size(34.dp)) {
-                                val w = size.width
-                                val h = size.height
-                                val path = Path().apply {
-                                    moveTo(w * 0.28f, h * 0.16f)
-                                    lineTo(w * 0.82f, h * 0.50f)
-                                    lineTo(w * 0.28f, h * 0.84f)
-                                    close()
-                                }
-                                drawPath(path = path, color = if (isDark) Color(0xFF8A8D78) else primaryColor)
-                            }
+                            // Modern vector Eyes icon matching the user's reference design
+                            ModernEyesIcon(
+                                modifier = Modifier.size(width = 50.dp, height = 44.dp)
+                            )
                         }
                         CircleTunerState.FLAT, CircleTunerState.SHARP -> {
                             // Clenched Fist 👊
@@ -510,6 +522,151 @@ private fun DirectionalChevron(
                 cap = StrokeCap.Round,
                 join = StrokeJoin.Round
             )
+        )
+    }
+}
+
+/**
+ * Modern vector Eyes icon matching the user's reference design:
+ * Two tall stadium (capsule) eyes joined in the center with bold outlines,
+ * solid white sclera, left-gazing stadium pupils, and crisp specular highlight dots.
+ */
+@Composable
+fun ModernEyesIcon(
+    modifier: Modifier = Modifier,
+    outlineColor: Color = Color(0xFF141416),
+    scleraColor: Color = Color.White,
+    pupilColor: Color = Color(0xFF141416)
+) {
+    val isDark = LocalIsDarkTheme.current
+    Canvas(
+        modifier = modifier
+            .testTag("modern_eyes_icon")
+    ) {
+        val w = size.width
+        val h = size.height
+        val strokeWidth = 3.2.dp.toPx().coerceIn(2.5f, h * 0.085f)
+        val halfStroke = strokeWidth / 2f
+
+        // Dimensions of each stadium eyeball
+        // The two eyes meet at the vertical centerline (w * 0.5f)
+        val top = halfStroke
+        val bottom = h - halfStroke
+        val eyeH = bottom - top
+
+        val left1 = halfStroke
+        val right1 = w * 0.5f + halfStroke * 0.5f
+        val eyeW1 = right1 - left1
+
+        val left2 = w * 0.5f - halfStroke * 0.5f
+        val right2 = w - halfStroke
+        val eyeW2 = right2 - left2
+
+        val cornerRadius1 = CornerRadius(eyeW1 / 2f, eyeW1 / 2f)
+        val cornerRadius2 = CornerRadius(eyeW2 / 2f, eyeW2 / 2f)
+
+        // Subtle outer contrast stroke in dark mode so the black outline pops against the dark pod
+        if (isDark) {
+            val outerStrokeWidth = strokeWidth + 1.6.dp.toPx()
+            val outerColor = Color(0x38FFFFFF)
+            drawRoundRect(
+                color = outerColor,
+                topLeft = Offset(left1, top),
+                size = Size(eyeW1, eyeH),
+                cornerRadius = cornerRadius1,
+                style = Stroke(width = outerStrokeWidth, cap = StrokeCap.Round, join = StrokeJoin.Round)
+            )
+            drawRoundRect(
+                color = outerColor,
+                topLeft = Offset(left2, top),
+                size = Size(eyeW2, eyeH),
+                cornerRadius = cornerRadius2,
+                style = Stroke(width = outerStrokeWidth, cap = StrokeCap.Round, join = StrokeJoin.Round)
+            )
+        }
+
+        // 1. Sclera fills (solid white interior)
+        drawRoundRect(
+            color = scleraColor,
+            topLeft = Offset(left1, top),
+            size = Size(eyeW1, eyeH),
+            cornerRadius = cornerRadius1
+        )
+        drawRoundRect(
+            color = scleraColor,
+            topLeft = Offset(left2, top),
+            size = Size(eyeW2, eyeH),
+            cornerRadius = cornerRadius2
+        )
+
+        // 2. Eyeball outer contours and center divider (bold black stroke)
+        drawRoundRect(
+            color = outlineColor,
+            topLeft = Offset(left1, top),
+            size = Size(eyeW1, eyeH),
+            cornerRadius = cornerRadius1,
+            style = Stroke(
+                width = strokeWidth,
+                cap = StrokeCap.Round,
+                join = StrokeJoin.Round
+            )
+        )
+        drawRoundRect(
+            color = outlineColor,
+            topLeft = Offset(left2, top),
+            size = Size(eyeW2, eyeH),
+            cornerRadius = cornerRadius2,
+            style = Stroke(
+                width = strokeWidth,
+                cap = StrokeCap.Round,
+                join = StrokeJoin.Round
+            )
+        )
+
+        // 3. Left-gazing stadium pupils (tall rounded capsule)
+        val pupilW = eyeW1 * 0.38f
+        val pupilH = eyeH * 0.45f
+        val pupilCornerRadius = CornerRadius(pupilW / 2f, pupilW / 2f)
+        val pupilTop = top + (eyeH - pupilH) * 0.5f
+
+        // Left eye pupil (hugging left interior wall)
+        val pupil1Left = left1 + strokeWidth * 0.8f + eyeW1 * 0.07f
+        drawRoundRect(
+            color = pupilColor,
+            topLeft = Offset(pupil1Left, pupilTop),
+            size = Size(pupilW, pupilH),
+            cornerRadius = pupilCornerRadius
+        )
+
+        // Right eye pupil (looking leftward in parallel)
+        val pupil2Left = left2 + strokeWidth * 0.8f + eyeW2 * 0.07f
+        drawRoundRect(
+            color = pupilColor,
+            topLeft = Offset(pupil2Left, pupilTop),
+            size = Size(pupilW, pupilH),
+            cornerRadius = pupilCornerRadius
+        )
+
+        // 4. Specular highlight reflection dots (upper-right quadrant of each pupil)
+        val dotRadius = (pupilW * 0.20f).coerceIn(1.8f, 3.2.dp.toPx())
+        val dot1Center = Offset(
+            x = pupil1Left + pupilW * 0.68f,
+            y = pupilTop + pupilH * 0.30f
+        )
+        val dot2Center = Offset(
+            x = pupil2Left + pupilW * 0.68f,
+            y = pupilTop + pupilH * 0.30f
+        )
+
+        drawCircle(
+            color = Color.White,
+            radius = dotRadius,
+            center = dot1Center
+        )
+        drawCircle(
+            color = Color.White,
+            radius = dotRadius,
+            center = dot2Center
         )
     }
 }
