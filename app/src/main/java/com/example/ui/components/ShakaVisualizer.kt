@@ -66,21 +66,25 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * Circle Component Tuner States per the Redesign Specification:
- * - READY: Idle/waiting for pluck or tuner paused
- * - FLAT: Pitch > 15 cents below target
- * - SHARP: Pitch > 15 cents above target
- * - CLOSE_FLAT: Pitch 5-15 cents below target
- * - CLOSE_SHARP: Pitch 5-15 cents above target
- * - PERFECT: Pitch within ±5 cents of target
+ * Circle Component Tuner States per the Spec and Thresholds:
+ * - READY: Idle/waiting for pluck or tuner paused (cycles 3 natural cartoon idle faces)
+ * - EXTREME_FLAT: Pitch > 35 cents below target ("RIP" tilted oval X-eyes + sad frown with tongue)
+ * - FLAT: Pitch 15-35 cents below target ("Flat - Tune up" flaming eyes)
+ * - CLOSE_FLAT: Pitch 5-15 cents below target ("Almost there" toothy grin)
+ * - PERFECT: Pitch within ±5 cents of target ("Perfect! In Tune" lightning bolt eyes)
+ * - CLOSE_SHARP: Pitch 5-15 cents above target ("Almost there" sweat drop eyes)
+ * - SHARP: Pitch 15-35 cents above target ("Sharp - Tune down" dizzy wavy eyes + stars)
+ * - EXTREME_SHARP: Pitch > 35 cents above target ("RIP" tilted oval X-eyes + sad downturned frown)
  */
 enum class CircleTunerState {
     READY,
+    EXTREME_FLAT,
     FLAT,
-    SHARP,
     CLOSE_FLAT,
+    PERFECT,
     CLOSE_SHARP,
-    PERFECT
+    SHARP,
+    EXTREME_SHARP
 }
 
 @Composable
@@ -102,7 +106,7 @@ fun ShakaVisualizer(
     val haptic = LocalHapticFeedback.current
     val isDark = LocalIsDarkTheme.current
 
-    // Raw state calculation from pitch sensor
+    // Raw state calculation from pitch sensor with expanded extreme thresholds
     val rawState = remember(isTunerActive, hasSignal, pitchResult, isAllStringsTuned) {
         if (isAllStringsTuned) {
             CircleTunerState.PERFECT
@@ -112,10 +116,12 @@ fun ShakaVisualizer(
             val cents = pitchResult.centsDiff
             when {
                 kotlin.math.abs(cents) <= com.example.model.MusicalPitchHelper.IN_TUNE_TOLERANCE_CENTS -> CircleTunerState.PERFECT
+                cents < -35.0 -> CircleTunerState.EXTREME_FLAT
                 cents < -15.0 -> CircleTunerState.FLAT
-                cents > 15.0 -> CircleTunerState.SHARP
                 cents < 0.0 -> CircleTunerState.CLOSE_FLAT
-                else -> CircleTunerState.CLOSE_SHARP
+                cents <= 15.0 -> CircleTunerState.CLOSE_SHARP
+                cents <= 35.0 -> CircleTunerState.SHARP
+                else -> CircleTunerState.EXTREME_SHARP
             }
         }
     }
@@ -125,6 +131,40 @@ fun ShakaVisualizer(
 
     LaunchedEffect(rawState) {
         debouncedState = rawState
+    }
+
+    // Idle face natural animation rotation: cycles 3 idle faces randomly with natural timing
+    var idleFaceType by remember { mutableStateOf(CartoonTunerFaceType.IDLE_PUFFY_SMILE) }
+
+    LaunchedEffect(debouncedState) {
+        if (debouncedState == CircleTunerState.READY) {
+            val idleFaces = listOf(
+                CartoonTunerFaceType.IDLE_PUFFY_SMILE,
+                CartoonTunerFaceType.IDLE_CHEEKY,
+                CartoonTunerFaceType.IDLE_SIDE_GLANCE
+            )
+            // Delays mix fast transitions (900ms - 1300ms) and longer lingering looks (2400ms - 3200ms)
+            val delayDurations = listOf(2800L, 1200L, 3200L, 900L, 2400L, 1600L)
+            var delayIndex = 0
+            while (true) {
+                val waitTime = delayDurations[delayIndex % delayDurations.size]
+                delay(waitTime)
+                delayIndex++
+                val nextOptions = idleFaces.filter { it != idleFaceType }
+                idleFaceType = nextOptions.random()
+            }
+        }
+    }
+
+    val currentFaceType: CartoonTunerFaceType = when (debouncedState) {
+        CircleTunerState.READY -> idleFaceType
+        CircleTunerState.EXTREME_FLAT -> CartoonTunerFaceType.EXTREME_SHARP
+        CircleTunerState.FLAT -> CartoonTunerFaceType.SHARP
+        CircleTunerState.CLOSE_FLAT -> CartoonTunerFaceType.CLOSE_SHARP
+        CircleTunerState.PERFECT -> CartoonTunerFaceType.PERFECT
+        CircleTunerState.CLOSE_SHARP -> CartoonTunerFaceType.CLOSE_SHARP
+        CircleTunerState.SHARP -> CartoonTunerFaceType.SHARP
+        CircleTunerState.EXTREME_SHARP -> CartoonTunerFaceType.EXTREME_SHARP
     }
 
     // Light haptic tick when entering the perfect zone (distinct from the confirmed lock-in double-pulse)
@@ -171,6 +211,7 @@ fun ShakaVisualizer(
     // Colors per spec
     val borderColorTarget = when (debouncedState) {
         CircleTunerState.READY -> if (isDark) Color(0xFF4A4D3A) else MaterialTheme.colorScheme.outlineVariant
+        CircleTunerState.EXTREME_FLAT, CircleTunerState.EXTREME_SHARP -> Color(0xFFDC2626)
         CircleTunerState.FLAT, CircleTunerState.SHARP -> Color(0xFFD85A30)
         CircleTunerState.CLOSE_FLAT, CircleTunerState.CLOSE_SHARP -> Color(0xFFEF9F27)
         CircleTunerState.PERFECT -> if (isDark) Color(0xFFC8FF3D) else Color(0xFF16A34A)
@@ -178,28 +219,29 @@ fun ShakaVisualizer(
     val borderColor by animateColorAsState(targetValue = borderColorTarget, label = "circleBorderColor")
 
     val arrowColorTarget = when (debouncedState) {
+        CircleTunerState.EXTREME_FLAT, CircleTunerState.EXTREME_SHARP -> Color(0xFFDC2626)
         CircleTunerState.FLAT, CircleTunerState.SHARP -> Color(0xFFD85A30)
         CircleTunerState.CLOSE_FLAT, CircleTunerState.CLOSE_SHARP -> Color(0xFFEF9F27)
         else -> Color.Transparent
     }
     val arrowColor by animateColorAsState(targetValue = arrowColorTarget, label = "arrowColor")
 
-    // Badge text and styling
+    // Badge text and styling matching the thresholds diagram
     val (badgeText, badgeTextColor, badgeBg) = when (debouncedState) {
         CircleTunerState.READY -> {
             val text = if (!isTunerActive) "Tap to start" else "Pluck a string"
             val textColor = if (isDark) Color(0xFF8A8D78) else MaterialTheme.colorScheme.onSurfaceVariant
             Triple(text, textColor, Color.Transparent)
         }
+        CircleTunerState.EXTREME_FLAT -> {
+            val textColor = if (isDark) Color(0xFFFFA285) else Color(0xFF7F1D1D)
+            val bg = if (isDark) Color(0xFF5C1D0E) else Color(0xFFFEE2E2)
+            Triple("RIP", textColor, bg)
+        }
         CircleTunerState.FLAT -> {
             val textColor = if (isDark) Color(0xFFF0997B) else Color(0xFF991B1B)
             val bg = if (isDark) Color(0xFF4A1B0C) else Color(0xFFFEE2E2)
             Triple("Flat — tune up", textColor, bg)
-        }
-        CircleTunerState.SHARP -> {
-            val textColor = if (isDark) Color(0xFFF0997B) else Color(0xFF991B1B)
-            val bg = if (isDark) Color(0xFF4A1B0C) else Color(0xFFFEE2E2)
-            Triple("Sharp — tune down", textColor, bg)
         }
         CircleTunerState.CLOSE_FLAT, CircleTunerState.CLOSE_SHARP -> {
             val textColor = if (isDark) Color(0xFFFAEC9F) else Color(0xFF854D0E)
@@ -210,11 +252,21 @@ fun ShakaVisualizer(
             val text = when {
                 isAllStringsTuned -> "Time to shred! 🎸"
                 isStringConfirmed -> "Locked in! ✓"
-                else -> "Perfect — in tune!"
+                else -> "Perfect! In Tune"
             }
             val textColor = if (isDark) Color(0xFF9FE1CB) else Color(0xFF166534)
             val bg = if (isDark) Color(0xFF04342C) else Color(0xFFDCFCE7)
             Triple(text, textColor, bg)
+        }
+        CircleTunerState.SHARP -> {
+            val textColor = if (isDark) Color(0xFFF0997B) else Color(0xFF991B1B)
+            val bg = if (isDark) Color(0xFF4A1B0C) else Color(0xFFFEE2E2)
+            Triple("Sharp — tune down", textColor, bg)
+        }
+        CircleTunerState.EXTREME_SHARP -> {
+            val textColor = if (isDark) Color(0xFFFFA285) else Color(0xFF7F1D1D)
+            val bg = if (isDark) Color(0xFF5C1D0E) else Color(0xFFFEE2E2)
+            Triple("RIP", textColor, bg)
         }
     }
 
@@ -273,14 +325,14 @@ fun ShakaVisualizer(
     val effectiveCircleScale = baseCircleScale * confirmedBurstScale.value
 
     val arrowDirectionUp = when (debouncedState) {
-        CircleTunerState.FLAT, CircleTunerState.CLOSE_FLAT -> true
-        CircleTunerState.SHARP, CircleTunerState.CLOSE_SHARP -> false
+        CircleTunerState.EXTREME_FLAT, CircleTunerState.FLAT, CircleTunerState.CLOSE_FLAT -> true
+        CircleTunerState.EXTREME_SHARP, CircleTunerState.SHARP, CircleTunerState.CLOSE_SHARP -> false
         else -> null
     }
 
     val arrowBounceOffsetDp = when (debouncedState) {
-        CircleTunerState.FLAT -> -urgentBounce.dp
-        CircleTunerState.SHARP -> urgentBounce.dp
+        CircleTunerState.EXTREME_FLAT, CircleTunerState.FLAT -> -urgentBounce.dp
+        CircleTunerState.EXTREME_SHARP, CircleTunerState.SHARP -> urgentBounce.dp
         CircleTunerState.CLOSE_FLAT -> -softBounce.dp
         CircleTunerState.CLOSE_SHARP -> softBounce.dp
         else -> 0.dp
@@ -401,47 +453,22 @@ fun ShakaVisualizer(
                     )
                 }
 
-                // Center Icon: morphs between states (play / fist / loosening fist / shaka)
+                // Center Animated Cartoon Face: expressive 1930s rubber-hose cartoon feedback
                 AnimatedContent(
-                    targetState = debouncedState,
+                    targetState = currentFaceType,
                     transitionSpec = {
-                        (fadeIn(animationSpec = tween(180)) + scaleIn(animationSpec = spring(stiffness = 500f)))
+                        (fadeIn(animationSpec = tween(160)) + scaleIn(animationSpec = spring(stiffness = 500f)))
                             .togetherWith(fadeOut(animationSpec = tween(120)) + scaleOut(animationSpec = tween(120)))
                     },
-                    label = "centerIconTransition"
-                ) { state ->
-                    when (state) {
-                        CircleTunerState.READY -> {
-                            // Modern vector Eyes icon matching the user's reference design
-                            ModernEyesIcon(
-                                modifier = Modifier.size(width = 50.dp, height = 44.dp)
-                            )
-                        }
-                        CircleTunerState.FLAT, CircleTunerState.SHARP -> {
-                            // Clenched Fist 👊
-                            Text(
-                                text = "👊",
-                                fontSize = 42.sp,
-                                lineHeight = 42.sp
-                            )
-                        }
-                        CircleTunerState.CLOSE_FLAT, CircleTunerState.CLOSE_SHARP -> {
-                            // Fist loosening ✊
-                            Text(
-                                text = "✊",
-                                fontSize = 42.sp,
-                                lineHeight = 42.sp
-                            )
-                        }
-                        CircleTunerState.PERFECT -> {
-                            // Shaka open 🤘 (rendered at larger scale when all strings are complete)
-                            Text(
-                                text = "🤘",
-                                fontSize = if (isAllStringsTuned) 52.sp else 44.sp,
-                                lineHeight = if (isAllStringsTuned) 52.sp else 44.sp
-                            )
-                        }
-                    }
+                    label = "centerCartoonFaceTransition"
+                ) { faceType ->
+                    val faceWidth = if (arrowDirectionUp != null) 78.dp else 84.dp
+                    val faceHeight = if (arrowDirectionUp != null) 70.dp else 76.dp
+                    CartoonTunerFace(
+                        faceType = faceType,
+                        isAllStringsTuned = isAllStringsTuned,
+                        modifier = Modifier.size(width = faceWidth, height = faceHeight)
+                    )
                 }
             }
         }

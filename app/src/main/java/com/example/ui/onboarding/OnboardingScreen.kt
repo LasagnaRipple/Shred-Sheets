@@ -1,5 +1,9 @@
 package com.example.ui.onboarding
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -31,13 +35,16 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
@@ -46,6 +53,10 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import com.example.R
 import androidx.compose.ui.text.style.TextAlign
@@ -56,17 +67,26 @@ import com.example.model.AppSettings
 import com.example.model.ColorMode
 import com.example.model.InstrumentType
 import com.example.ui.components.InstrumentIcon
+import kotlinx.coroutines.launch
 
 @Composable
 fun OnboardingScreen(
     initialSettings: AppSettings,
     onUpdateTheme: (ColorMode, AccentColor) -> Unit = { _, _ -> },
+    onThemeToggle: () -> Unit = {},
     onComplete: (AppSettings) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var selectedInstrument by remember { mutableStateOf(initialSettings.selectedInstrument) }
     var selectedColorMode by remember { mutableStateOf(initialSettings.colorMode) }
     var selectedAccent by remember { mutableStateOf(initialSettings.accentColor) }
+
+    val logoScale = remember { Animatable(1f) }
+    val coroutineScope = rememberCoroutineScope()
+
+    LaunchedEffect(initialSettings.accentColor) {
+        selectedAccent = initialSettings.accentColor
+    }
 
     val scrollState = rememberScrollState()
     val haptic = LocalHapticFeedback.current
@@ -81,18 +101,50 @@ fun OnboardingScreen(
     ) {
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Shred Sheets Arched Rock Logo
-        Image(
-            painter = painterResource(id = R.drawable.ic_shred_sheets_logo),
-            contentDescription = "SHRED SHEETS",
-            colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.primary),
+        // Shred Sheets Arched Rock Logo (Tap to cycle accent color)
+        Box(
             modifier = Modifier
                 .fillMaxWidth(0.85f)
-                .heightIn(max = 110.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .clickable {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    coroutineScope.launch {
+                        logoScale.animateTo(0.88f, animationSpec = tween(70))
+                        logoScale.animateTo(
+                            1f,
+                            animationSpec = spring(
+                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                stiffness = Spring.StiffnessMedium
+                            )
+                        )
+                    }
+                    val isDark = selectedColorMode == ColorMode.DARK
+                    val allowed = AccentColor.entries.filter { if (isDark) it.darkAllowed else it.lightAllowed }
+                    val currentIndex = allowed.indexOf(selectedAccent)
+                    val nextAccent = if (currentIndex >= 0) allowed[(currentIndex + 1) % allowed.size] else allowed.first()
+                    selectedAccent = nextAccent
+                    onUpdateTheme(selectedColorMode, nextAccent)
+                    onThemeToggle()
+                }
                 .padding(vertical = 4.dp)
+                .semantics {
+                    role = Role.Button
+                    contentDescription = "Shred Sheets logo. Tap to cycle accent color theme."
+                }
                 .testTag("shred_sheets_logo"),
-            contentScale = ContentScale.Fit
-        )
+            contentAlignment = Alignment.Center
+        ) {
+            Image(
+                painter = painterResource(id = R.drawable.ic_shred_sheets_logo),
+                contentDescription = null,
+                colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.primary),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 110.dp)
+                    .scale(logoScale.value),
+                contentScale = ContentScale.Fit
+            )
+        }
 
         Spacer(modifier = Modifier.height(8.dp))
 
@@ -183,24 +235,26 @@ fun OnboardingScreen(
 
                 val isDark = selectedColorMode == ColorMode.DARK
 
-                // Light / Dark Mode selector
+                // Segmented Pill Toggle: [ Dark 🌙 | Light ☀️ ] like loop screen
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(if (isDark) Color(0xFF0F141C) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
+                        .border(
+                            1.dp,
+                            if (isDark) Color(0xFF263242) else MaterialTheme.colorScheme.outlineVariant,
+                            RoundedCornerShape(999.dp)
+                        )
+                        .padding(3.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Dark Mode Button
+                    // Dark Mode Pill
                     Box(
                         modifier = Modifier
                             .weight(1f)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(
-                                if (isDark) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                            )
-                            .border(
-                                1.5.dp,
-                                if (isDark) MaterialTheme.colorScheme.primary else Color.Transparent,
-                                RoundedCornerShape(12.dp)
-                            )
+                            .clip(RoundedCornerShape(999.dp))
+                            .background(if (isDark) MaterialTheme.colorScheme.primary else Color.Transparent)
                             .clickable {
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 selectedColorMode = ColorMode.DARK
@@ -214,24 +268,20 @@ fun OnboardingScreen(
                     ) {
                         Text(
                             text = "Dark 🌙",
-                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                            color = if (isDark) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontWeight = if (isDark) FontWeight.Bold else FontWeight.SemiBold,
+                                fontSize = 14.sp
+                            ),
+                            color = Color.Black
                         )
                     }
 
-                    // Light Mode Button
+                    // Light Mode Pill
                     Box(
                         modifier = Modifier
                             .weight(1f)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(
-                                if (!isDark) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                            )
-                            .border(
-                                1.5.dp,
-                                if (!isDark) MaterialTheme.colorScheme.primary else Color.Transparent,
-                                RoundedCornerShape(12.dp)
-                            )
+                            .clip(RoundedCornerShape(999.dp))
+                            .background(if (!isDark) MaterialTheme.colorScheme.primary else Color.Transparent)
                             .clickable {
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 selectedColorMode = ColorMode.LIGHT
@@ -245,8 +295,11 @@ fun OnboardingScreen(
                     ) {
                         Text(
                             text = "Light ☀️",
-                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                            color = if (!isDark) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontWeight = if (!isDark) FontWeight.Bold else FontWeight.Medium,
+                                fontSize = 14.sp
+                            ),
+                            color = if (!isDark) MaterialTheme.colorScheme.onPrimary else if (isDark) Color(0xFF94A3B8) else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -277,7 +330,7 @@ fun OnboardingScreen(
             )
         ) {
             Text(
-                text = "START SHREDDING! 🤙",
+                text = "START SHREDDING!",
                 style = MaterialTheme.typography.titleMedium.copy(
                     fontWeight = FontWeight.Black,
                     fontSize = 18.sp

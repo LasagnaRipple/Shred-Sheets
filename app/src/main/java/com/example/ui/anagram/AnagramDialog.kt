@@ -18,9 +18,11 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ElectricBolt
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -40,6 +42,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -48,6 +51,11 @@ import androidx.compose.ui.window.Dialog
 import com.example.model.InstrumentConfig
 import com.example.model.InstrumentString
 import com.example.model.TuningMode
+import com.example.ui.theme.LocalIsDarkTheme
+import com.example.ui.theme.ShredCardBorder
+import com.example.ui.theme.ShredCardSurface
+import com.example.ui.theme.ShredMutedText
+import com.example.ui.theme.ShredPrimaryText
 
 @Composable
 fun AnagramDialog(
@@ -58,6 +66,12 @@ fun AnagramDialog(
     onDismiss: () -> Unit
 ) {
     var isCustomMode by remember { mutableStateOf(false) }
+    val isDark = LocalIsDarkTheme.current
+    val dialogSurface = if (isDark) ShredCardSurface else MaterialTheme.colorScheme.surface
+    val dialogBorder = if (isDark) ShredCardBorder else MaterialTheme.colorScheme.outlineVariant
+    val primaryText = if (isDark) ShredPrimaryText else MaterialTheme.colorScheme.onSurface
+    val mutedText = if (isDark) ShredMutedText else MaterialTheme.colorScheme.onSurfaceVariant
+    val primaryColor = MaterialTheme.colorScheme.primary
 
     // List of words for each string in tuning
     val customWords = remember(tuningMode) {
@@ -73,11 +87,11 @@ fun AnagramDialog(
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(8.dp)
-                .clip(RoundedCornerShape(24.dp))
-                .border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(24.dp)),
+                .padding(4.dp)
+                .clip(RoundedCornerShape(20.dp))
+                .border(1.5.dp, dialogBorder, RoundedCornerShape(20.dp)),
             colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface
+                containerColor = dialogSurface
             )
         ) {
             Column(
@@ -86,34 +100,49 @@ fun AnagramDialog(
                     .padding(20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Header
+                // Header with Info Icon, Title and Close Button (matching Chord Library style)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(text = "🎸", fontSize = 22.sp)
-                        Spacer(modifier = Modifier.width(8.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Info,
+                            contentDescription = null,
+                            tint = primaryColor,
+                            modifier = Modifier.size(24.dp)
+                        )
                         Text(
                             text = "String Anagrams",
                             style = MaterialTheme.typography.titleLarge.copy(
-                                fontWeight = FontWeight.Black
+                                fontWeight = FontWeight.Black,
+                                fontSize = 19.sp
                             ),
-                            color = MaterialTheme.colorScheme.primary
+                            color = primaryText
                         )
                     }
 
-                    IconButton(onClick = onDismiss) {
-                        Icon(imageVector = Icons.Default.Close, contentDescription = "Close")
+                    IconButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.testTag("close_anagram_dialog_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Close",
+                            tint = mutedText
+                        )
                     }
                 }
 
                 Text(
                     text = "Fun mnemonics to remember your guitar string names!",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.fillMaxWidth()
+                    color = mutedText,
+                    modifier = Modifier.fillMaxWidth().padding(top = 2.dp)
                 )
 
                 Spacer(modifier = Modifier.height(14.dp))
@@ -127,8 +156,17 @@ fun AnagramDialog(
                         modifier = Modifier
                             .weight(1f)
                             .clip(RoundedCornerShape(12.dp))
-                            .background(if (!isCustomMode) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant)
-                            .border(1.dp, if (!isCustomMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp))
+                            .background(
+                                if (!isCustomMode) primaryColor.copy(alpha = 0.15f)
+                                else if (isDark) ShredCardBorder.copy(alpha = 0.25f)
+                                else MaterialTheme.colorScheme.surfaceVariant
+                            )
+                            .border(
+                                1.dp,
+                                if (!isCustomMode) primaryColor.copy(alpha = 0.7f)
+                                else if (isDark) ShredCardBorder else MaterialTheme.colorScheme.outlineVariant,
+                                RoundedCornerShape(12.dp)
+                            )
                             .clickable { isCustomMode = false }
                             .padding(vertical = 8.dp),
                         contentAlignment = Alignment.Center
@@ -136,7 +174,7 @@ fun AnagramDialog(
                         Text(
                             text = "Fun Presets ⚡",
                             fontWeight = FontWeight.Bold,
-                            color = if (!isCustomMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                            color = if (!isCustomMode) primaryColor else mutedText
                         )
                     }
 
@@ -144,8 +182,17 @@ fun AnagramDialog(
                         modifier = Modifier
                             .weight(1f)
                             .clip(RoundedCornerShape(12.dp))
-                            .background(if (isCustomMode) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant)
-                            .border(1.dp, if (isCustomMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp))
+                            .background(
+                                if (isCustomMode) primaryColor.copy(alpha = 0.15f)
+                                else if (isDark) ShredCardBorder.copy(alpha = 0.25f)
+                                else MaterialTheme.colorScheme.surfaceVariant
+                            )
+                            .border(
+                                1.dp,
+                                if (isCustomMode) primaryColor.copy(alpha = 0.7f)
+                                else if (isDark) ShredCardBorder else MaterialTheme.colorScheme.outlineVariant,
+                                RoundedCornerShape(12.dp)
+                            )
                             .clickable { isCustomMode = true }
                             .padding(vertical = 8.dp),
                         contentAlignment = Alignment.Center
@@ -153,7 +200,7 @@ fun AnagramDialog(
                         Text(
                             text = "Create My Own ✏️",
                             fontWeight = FontWeight.Bold,
-                            color = if (isCustomMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                            color = if (isCustomMode) primaryColor else mutedText
                         )
                     }
                 }
@@ -176,11 +223,15 @@ fun AnagramDialog(
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(14.dp))
                                     .background(
-                                        if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                        if (isSelected) primaryColor.copy(alpha = 0.15f)
+                                        else if (isDark) ShredCardBorder.copy(alpha = 0.25f)
+                                        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                                     )
                                     .border(
-                                        1.5.dp,
-                                        if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
+                                        1.dp,
+                                        if (isSelected) primaryColor.copy(alpha = 0.7f)
+                                        else if (isDark) ShredCardBorder.copy(alpha = 0.5f)
+                                        else Color.Transparent,
                                         RoundedCornerShape(14.dp)
                                     )
                                     .clickable {
@@ -198,11 +249,16 @@ fun AnagramDialog(
                                     Text(
                                         text = preset,
                                         style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                        color = if (isSelected) primaryColor else primaryText,
                                         modifier = Modifier.weight(1f)
                                     )
                                     if (isSelected) {
-                                        Text(text = "✅", fontSize = 16.sp)
+                                        Icon(
+                                            imageVector = Icons.Default.Check,
+                                            contentDescription = "Selected",
+                                            tint = primaryColor,
+                                            modifier = Modifier.size(20.dp)
+                                        )
                                     }
                                 }
                             }
@@ -227,13 +283,14 @@ fun AnagramDialog(
                                     modifier = Modifier
                                         .size(36.dp)
                                         .clip(CircleShape)
-                                        .background(MaterialTheme.colorScheme.primaryContainer),
+                                        .background(primaryColor.copy(alpha = 0.15f))
+                                        .border(1.dp, primaryColor.copy(alpha = 0.4f), CircleShape),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text(
                                         text = str.noteLetter,
                                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
-                                        color = MaterialTheme.colorScheme.primary
+                                        color = primaryColor
                                     )
                                 }
 
@@ -251,8 +308,10 @@ fun AnagramDialog(
                                         .testTag("custom_word_input_$index"),
                                     shape = RoundedCornerShape(12.dp),
                                     colors = OutlinedTextFieldDefaults.colors(
-                                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+                                        focusedBorderColor = primaryColor,
+                                        unfocusedBorderColor = if (isDark) ShredCardBorder else MaterialTheme.colorScheme.outlineVariant,
+                                        focusedTextColor = primaryText,
+                                        unfocusedTextColor = primaryText
                                     )
                                 )
                             }
@@ -269,19 +328,20 @@ fun AnagramDialog(
                         },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(50.dp)
+                            .height(48.dp)
                             .testTag("save_custom_anagram_button"),
                         shape = RoundedCornerShape(14.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary
+                            containerColor = primaryColor,
+                            contentColor = Color(0xFF12140F)
                         )
                     ) {
                         Icon(imageVector = Icons.Default.Save, contentDescription = "Save")
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = "Save Rockstar Anagram 🤙",
-                            fontWeight = FontWeight.ExtraBold,
-                            color = MaterialTheme.colorScheme.onPrimary
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF12140F)
                         )
                     }
                 }

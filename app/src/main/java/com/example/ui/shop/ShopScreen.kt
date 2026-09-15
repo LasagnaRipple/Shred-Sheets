@@ -4,6 +4,7 @@ import android.content.Intent
 import android.net.Uri
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -41,12 +42,16 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBackIos
 import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
+import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.NightlightRound
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Verified
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -64,6 +69,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -93,6 +99,8 @@ import kotlin.math.absoluteValue
 data class ShredSheetsProduct(
     val id: Int,
     val title: String,
+    val instrument: String,
+    val edition: String,
     val subtitle: String,
     val badge: String,
     val badgeColor: Color,
@@ -105,80 +113,265 @@ data class ShredSheetsProduct(
 val SHRED_SHEETS_CATALOG = listOf(
     ShredSheetsProduct(
         id = 1,
-        title = "Guitar Edition",
-        subtitle = "Blank Tabs for Future Rockstars",
-        badge = "HERO ORIGINAL",
+        title = "Guitar - Rocker",
+        instrument = "Guitar",
+        edition = "Rocker",
+        subtitle = "High-Voltage Blank Tabs for Riffs & Solos",
+        badge = "ELECTRIC ROCK",
         badgeColor = Color(0xFFEF4444),
-        price = "$12.99",
-        description = "The flagship tab journal for electric & acoustic guitarists. Features 6-string staves paired with chord chart boxes on every spread.",
-        specs = listOf("120 Acid-Free Pages", "Lay-Flat Wire-O Binding", "Standard 6-String Tabs + Chords"),
-        amazonUrl = "https://www.amazon.com/s?k=shred+sheets+guitar+edition"
+        price = "$9.99 USD",
+        description = "Engineered for electric guitarists tearing up stages, garages, and studios. High-clarity 6-string tablature staves paired with chord chart boxes and dedicated solo lick sections.",
+        specs = listOf(
+            "Standard 6-String Guitar Staves + Chord Grids",
+            "120 Acid-Free Bleed-Proof Heavyweight Pages",
+            "Lay-Flat Double Wire-O Spiral Binding",
+            "Pentatonic & Power Chord Quick Reference"
+        ),
+        amazonUrl = "https://www.amazon.com/s?k=shred+sheets+guitar+rocker"
     ),
     ShredSheetsProduct(
         id = 2,
-        title = "Bass Edition",
-        subtitle = "Low-End Precision for Bassists",
-        badge = "BESTSELLER",
-        badgeColor = Color(0xFF8B5CF6),
-        price = "$12.99",
-        description = "Specially calibrated 4 and 5 string tablature layout with generous spacing for grooves, walking lines, and slap bass riffs.",
-        specs = listOf("4 & 5 String Bass Staves", "100gsm Ink Bleed-Proof Stock", "Scale & Fretboard Quick Reference"),
-        amazonUrl = "https://www.amazon.com/s?k=shred+sheets+bass+edition"
+        title = "Guitar - Songwriter",
+        instrument = "Guitar",
+        edition = "Songwriter",
+        subtitle = "Lyrics, Progressions & Guitar Staves Side-by-Side",
+        badge = "ACOUSTIC & LYRICS",
+        badgeColor = Color(0xFFF59E0B),
+        price = "$9.99 USD",
+        description = "The premier acoustic and songwriting journal. Facing dual-page spreads dedicate the left page to lyrics, song structure, and chord progressions, while the right page provides 6-string guitar tablature.",
+        specs = listOf(
+            "Facing-Page Lyric Sheet & Guitar Tab Layout",
+            "Song Structure Prompts (Verse, Chorus, Bridge)",
+            "Chord Progression & Voicing Reference Boxes",
+            "140 Perforated Cream Pages with Pocket Folder"
+        ),
+        amazonUrl = "https://www.amazon.com/s?k=shred+sheets+guitar+songwriter"
     ),
     ShredSheetsProduct(
         id = 3,
-        title = "7-String & Extended",
-        subtitle = "Modern Metal, Prog & Djent",
-        badge = "HEAVY METAL",
-        badgeColor = Color(0xFF10B981),
-        price = "$13.99",
-        description = "Engineered for low tunings (Drop A, Drop G, 8-string). Wide tablature grids allow rapid transcription of intricate polyrhythms.",
-        specs = listOf("7 & 8 String Formats", "Extra Wide Fret Grids", "Thick 120gsm Heavyweight Paper"),
-        amazonUrl = "https://www.amazon.com/s?k=shred+sheets+7+string"
+        title = "Guitar - Midnighter",
+        instrument = "Guitar",
+        edition = "Midnighter",
+        subtitle = "Stealth Matte Obsidian for Late-Night Shred",
+        badge = "MIDNIGHT STEALTH",
+        badgeColor = Color(0xFF06B6D4),
+        price = "$9.99 USD",
+        description = "Tuned for nocturnal shredders, bedroom producers, and progressive metalists. Sleek stealth matte black aesthetic with ultra-high contrast crisp white staves that stay visible under dim ambient studio lighting.",
+        specs = listOf(
+            "Stealth Matte Obsidian Heavy Cardstock Cover",
+            "High-Contrast White Tab Grids for Dim Light",
+            "120gsm Anti-Bleed Dark-Edge Paper Stock",
+            "Lay-Flat Wire-O Binding for 360° Desktop Use"
+        ),
+        amazonUrl = "https://www.amazon.com/s?k=shred+sheets+guitar+midnighter"
     ),
     ShredSheetsProduct(
         id = 4,
-        title = "Songwriter Edition",
-        subtitle = "Lyrics, Chords & Staves Side-by-Side",
-        badge = "NEW RELEASE",
-        badgeColor = Color(0xFFF59E0B),
-        price = "$14.99",
-        description = "Left page dedicated to song structure, lyrics, and harmonic progressions; right page features dual guitar & vocal notation.",
-        specs = listOf("Facing Spread Layout", "Song Structure Prompts", "140 Perforated Sheets"),
-        amazonUrl = "https://www.amazon.com/s?k=shred+sheets+songwriter+edition"
+        title = "Bass - Rocker",
+        instrument = "Bass",
+        edition = "Rocker",
+        subtitle = "Heavy Low-End Riffs, Slap & Walking Grooves",
+        badge = "HEAVY GROOVE",
+        badgeColor = Color(0xFF8B5CF6),
+        price = "$9.99 USD",
+        description = "Calibrated specifically for bassists driving the rhythm section. Features generous 4-string and 5-string bass tablature staves with expanded vertical spacing tailored for rapid slap bass, pop lines, and walking grooves.",
+        specs = listOf(
+            "4-String & 5-String Bass Staves with Extra Spacing",
+            "Fretboard Map & Key Root Note Quick Reference",
+            "120 Acid-Free Heavyweight Bleed-Proof Pages",
+            "Durable Crush-Resistant Double Wire-O Binding"
+        ),
+        amazonUrl = "https://www.amazon.com/s?k=shred+sheets+bass+rocker"
     ),
     ShredSheetsProduct(
         id = 5,
-        title = "Pocket Rockstar Spiral",
-        subtitle = "Tour Bus & Gigbag Travel Edition",
-        badge = "COMPACT TRAVEL",
-        badgeColor = Color(0xFF06B6D4),
-        price = "$9.99",
-        description = "A5 compact footprint with rugged water-resistant poly covers and double-loop spiral for writing on tour, backstage, or rehearsals.",
-        specs = listOf("Compact A5 Size", "Heavy Duty Waterproof Poly Cover", "Elastic Band Closure"),
-        amazonUrl = "https://www.amazon.com/s?k=shred+sheets+pocket+edition"
+        title = "Bass - Songwriter",
+        instrument = "Bass",
+        edition = "Songwriter",
+        subtitle = "Arrangement, Chord Roots & Melodic Basslines",
+        badge = "BASS ARRANGER",
+        badgeColor = Color(0xFF10B981),
+        price = "$9.99 USD",
+        description = "Created for multi-instrumentalists, bandleaders, and bass composers. Side-by-side pages connect chord root charts, arrangement notes, and tempo markers directly with custom bassline tablature.",
+        specs = listOf(
+            "Side-by-Side Arrangement & Bass Tab Spreads",
+            "Chord Root Notation & Harmonic Progression Grids",
+            "Circle of 5ths & Modal Bass Scales Guide",
+            "140 Perforated Pages with Ribbon Marker"
+        ),
+        amazonUrl = "https://www.amazon.com/s?k=shred+sheets+bass+songwriter"
     ),
     ShredSheetsProduct(
         id = 6,
-        title = "Deluxe Collector's Hardcover",
-        subtitle = "Foil Stamped Archival Edition",
-        badge = "LIMITED EDITION",
-        badgeColor = Color(0xFFEAB308),
-        price = "$19.99",
-        description = "Casebound hard linen cover with metallic hot-foil lettering, double ribbon bookmarks, and luxury 120gsm warm ivory paper.",
-        specs = listOf("Embossed Linen Hardcover", "Dual Ribbon Bookmarks", "Expandable Back Pocket"),
-        amazonUrl = "https://www.amazon.com/s?k=shred+sheets+deluxe+edition"
+        title = "Bass - Midnighter",
+        instrument = "Bass",
+        edition = "Midnighter",
+        subtitle = "Nocturnal Groove Lab for Sub-Bass & Synth-Bass",
+        badge = "MIDNIGHT SUB-BASS",
+        badgeColor = Color(0xFFEC4899),
+        price = "$9.99 USD",
+        description = "A blackout edition tuned for late-night basement jams, synth-bass transcription, and drop-tuned low-end exploration. Stealth dark styling paired with razor-sharp stave contrast.",
+        specs = listOf(
+            "Matte Velvet Blackout Cover with Neon Magenta Foil",
+            "Tuned for 4-String, 5-String & Drop Tunings",
+            "High-Contrast Tablature for Low-Light Practice",
+            "Heavy 120gsm Paper Proof Against Markers & Gel Pens"
+        ),
+        amazonUrl = "https://www.amazon.com/s?k=shred+sheets+bass+midnighter"
     )
 )
 
+/**
+ * Dedicated renderer for the Shred Sheets book cover with custom edition styling.
+ */
+@Composable
+fun ShredSheetsCoverItem(
+    product: ShredSheetsProduct,
+    modifier: Modifier = Modifier,
+    isReflection: Boolean = false
+) {
+    Box(
+        modifier = modifier
+            .background(Color(0xFF12141C))
+    ) {
+        // Base book cover image
+        Image(
+            painter = painterResource(id = R.drawable.shred_sheets_cover),
+            contentDescription = if (isReflection) null else "Shred Sheets ${product.title}",
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize()
+        )
+
+        // Subtle atmosphere color wash matching the edition badge
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(
+                            product.badgeColor.copy(alpha = if (product.edition == "Midnighter") 0.16f else 0.24f),
+                            Color.Transparent
+                        ),
+                        center = Offset(220f, 160f)
+                    )
+                )
+        )
+
+        // Midnighter stealth dark tone overlay
+        if (product.edition == "Midnighter") {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color.Black.copy(alpha = 0.20f),
+                                Color.Black.copy(alpha = 0.42f)
+                            )
+                        )
+                    )
+            )
+        }
+
+        // Edition Foil Plate on lower section of book
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 16.dp, start = 14.dp, end = 14.dp)
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .background(Color(0xFF090B10).copy(alpha = 0.90f))
+                .border(
+                    width = 1.dp,
+                    brush = Brush.horizontalGradient(
+                        listOf(
+                            product.badgeColor.copy(alpha = 0.85f),
+                            Color.White.copy(alpha = 0.45f),
+                            product.badgeColor.copy(alpha = 0.85f)
+                        )
+                    ),
+                    shape = RoundedCornerShape(8.dp)
+                )
+                .padding(horizontal = 10.dp, vertical = 6.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = product.instrument.uppercase(),
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = FontWeight.Black,
+                            fontSize = 9.sp,
+                            letterSpacing = 1.5.sp
+                        ),
+                        color = Color(0xFF94A3B8)
+                    )
+                    Text(
+                        text = product.edition.uppercase(),
+                        style = MaterialTheme.typography.titleSmall.copy(
+                            fontWeight = FontWeight.Black,
+                            fontSize = 13.sp,
+                            letterSpacing = 0.5.sp
+                        ),
+                        color = product.badgeColor
+                    )
+                }
+
+                // Edition Motif Icon
+                Box(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .clip(CircleShape)
+                        .background(product.badgeColor.copy(alpha = 0.2f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    val icon = when (product.edition) {
+                        "Rocker" -> Icons.Default.Bolt
+                        "Songwriter" -> Icons.Default.MusicNote
+                        else -> Icons.Default.NightlightRound
+                    }
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = product.badgeColor,
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
+            }
+        }
+
+        // Realistic Book Spine Sheen / Gradient overlay on left edge
+        Box(
+            modifier = Modifier
+                .width(18.dp)
+                .fillMaxSize()
+                .background(
+                    Brush.horizontalGradient(
+                        colors = listOf(
+                            Color.White.copy(alpha = 0.22f),
+                            Color.White.copy(alpha = 0.05f),
+                            Color.Transparent
+                        )
+                    )
+                )
+        )
+    }
+}
+
 @Composable
 fun ShopScreen(
+    onThemeToggle: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val isDark = LocalIsDarkTheme.current
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
+    val titleScale = remember { Animatable(1f) }
+    val titleScope = rememberCoroutineScope()
 
     val pagerState = rememberPagerState(
         initialPage = 0,
@@ -224,17 +417,44 @@ fun ShopScreen(
         ) {
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Screen Header: "Buy Shred Sheets"
-            Text(
-                text = "Buy Shred Sheets",
-                style = MaterialTheme.typography.headlineMedium.copy(
-                    fontWeight = FontWeight.Black,
-                    fontSize = 28.sp,
-                    letterSpacing = (-0.5).sp
-                ),
-                color = Color.White,
-                modifier = Modifier.testTag("shop_screen_title")
-            )
+            // Screen Header: "Buy Shred Sheets" (matching screen title style and tap-to-change color functionality)
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        titleScope.launch {
+                            titleScale.animateTo(0.90f, animationSpec = tween(70))
+                            titleScale.animateTo(
+                                1f,
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                                    stiffness = Spring.StiffnessMedium
+                                )
+                            )
+                        }
+                        onThemeToggle()
+                    }
+                    .padding(horizontal = 8.dp, vertical = 2.dp)
+                    .semantics {
+                        role = Role.Button
+                        contentDescription = "Buy Shred Sheets title. Tap to cycle accent color theme."
+                    }
+                    .testTag("shop_screen_title"),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "Buy Shred Sheets",
+                    style = MaterialTheme.typography.headlineLarge.copy(
+                        fontWeight = FontWeight.Black,
+                        fontSize = 32.sp,
+                        lineHeight = 36.sp,
+                        letterSpacing = (-0.5).sp
+                    ),
+                    color = activeAccentColor,
+                    modifier = Modifier.scale(titleScale.value)
+                )
+            }
 
             Text(
                 text = "Blank Tabs for Future Rockstars • Official Catalogue",
@@ -243,8 +463,85 @@ fun ShopScreen(
                     fontSize = 13.sp
                 ),
                 color = Color(0xFF94A3B8),
-                modifier = Modifier.padding(top = 4.dp, bottom = 18.dp)
+                modifier = Modifier.padding(top = 4.dp, bottom = 12.dp)
             )
+
+            // Instrument Quick Switcher (Guitar 1-3 | Bass 4-6)
+            Row(
+                modifier = Modifier
+                    .padding(bottom = 16.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(Color(0xFF141721))
+                    .border(1.dp, Color(0xFF282F40), RoundedCornerShape(20.dp))
+                    .padding(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                val isGuitar = pagerState.currentPage < 3
+                val isBass = pagerState.currentPage >= 3
+
+                // Guitar Switcher Pill
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(
+                            if (isGuitar) Color(0xFFEF4444).copy(alpha = 0.22f) else Color.Transparent
+                        )
+                        .border(
+                            1.dp,
+                            if (isGuitar) Color(0xFFEF4444).copy(alpha = 0.75f) else Color.Transparent,
+                            RoundedCornerShape(16.dp)
+                        )
+                        .clickable {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            scope.launch {
+                                val target = if (pagerState.currentPage >= 3) pagerState.currentPage - 3 else pagerState.currentPage
+                                pagerState.animateScrollToPage(target)
+                            }
+                        }
+                        .padding(horizontal = 16.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        text = "🎸 Guitar (3)",
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontWeight = if (isGuitar) FontWeight.Bold else FontWeight.Medium,
+                            fontSize = 12.sp
+                        ),
+                        color = if (isGuitar) Color.White else Color(0xFF94A3B8)
+                    )
+                }
+
+                // Bass Switcher Pill
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(
+                            if (isBass) Color(0xFF8B5CF6).copy(alpha = 0.22f) else Color.Transparent
+                        )
+                        .border(
+                            1.dp,
+                            if (isBass) Color(0xFF8B5CF6).copy(alpha = 0.75f) else Color.Transparent,
+                            RoundedCornerShape(16.dp)
+                        )
+                        .clickable {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            scope.launch {
+                                val target = if (pagerState.currentPage < 3) pagerState.currentPage + 3 else pagerState.currentPage
+                                pagerState.animateScrollToPage(target)
+                            }
+                        }
+                        .padding(horizontal = 16.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        text = "🎸 Bass (3)",
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontWeight = if (isBass) FontWeight.Bold else FontWeight.Medium,
+                            fontSize = 12.sp
+                        ),
+                        color = if (isBass) Color.White else Color(0xFF94A3B8)
+                    )
+                }
+            }
 
             // SHOWROOM CAROUSEL SECTION
             BoxWithConstraints(
@@ -268,6 +565,7 @@ fun ShopScreen(
                     val pageOffset = ((pagerState.currentPage - page) + pagerState.currentPageOffsetFraction).absoluteValue
                     val scale = lerp(0.86f, 1f, (1f - pageOffset).coerceIn(0f, 1f))
                     val alpha = lerp(0.55f, 1f, (1f - pageOffset).coerceIn(0f, 1f))
+                    val product = SHRED_SHEETS_CATALOG[page]
 
                     Column(
                         modifier = Modifier
@@ -285,9 +583,9 @@ fun ShopScreen(
                                 .fillMaxWidth()
                                 .aspectRatio(0.75f) // 3:4 Book Ratio
                                 .shadow(
-                                    elevation = if (page == pagerState.currentPage) 20.dp else 6.dp,
+                                    elevation = if (page == pagerState.currentPage) 22.dp else 6.dp,
                                     shape = RoundedCornerShape(12.dp),
-                                    ambientColor = activeAccentColor.copy(alpha = 0.4f),
+                                    ambientColor = product.badgeColor.copy(alpha = 0.45f),
                                     spotColor = Color.Black
                                 )
                                 .clip(RoundedCornerShape(12.dp))
@@ -295,36 +593,18 @@ fun ShopScreen(
                                     width = 1.5.dp,
                                     brush = Brush.verticalGradient(
                                         colors = listOf(
-                                            if (page == pagerState.currentPage) activeAccentColor.copy(alpha = 0.8f) else Color(0xFF334155),
+                                            if (page == pagerState.currentPage) product.badgeColor.copy(alpha = 0.85f) else Color(0xFF334155),
                                             Color(0xFF1E293B)
                                         )
                                     ),
                                     shape = RoundedCornerShape(12.dp)
                                 )
-                                .background(Color(0xFF141518))
                         ) {
-                            // The Attached Product Image loaded for each of the 6 variants
-                            Image(
-                                painter = painterResource(id = R.drawable.shred_sheets_cover),
-                                contentDescription = "Shred Sheets ${SHRED_SHEETS_CATALOG[page].title}",
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize()
-                            )
-
-                            // Realistic Book Spine Sheen / Gradient overlay on left edge
-                            Box(
-                                modifier = Modifier
-                                    .width(18.dp)
-                                    .fillMaxSize()
-                                    .background(
-                                        Brush.horizontalGradient(
-                                            colors = listOf(
-                                                Color.White.copy(alpha = 0.22f),
-                                                Color.White.copy(alpha = 0.05f),
-                                                Color.Transparent
-                                            )
-                                        )
-                                    )
+                            // Dedicated custom styled cover for this variation
+                            ShredSheetsCoverItem(
+                                product = product,
+                                modifier = Modifier.fillMaxSize(),
+                                isReflection = false
                             )
                         }
 
@@ -339,15 +619,14 @@ fun ShopScreen(
                                 }
                                 .clip(RoundedCornerShape(bottomStart = 12.dp, bottomEnd = 12.dp))
                         ) {
-                            // Inverted Book Image
-                            Image(
-                                painter = painterResource(id = R.drawable.shred_sheets_cover),
-                                contentDescription = null,
-                                contentScale = ContentScale.Crop,
+                            // Inverted Book Cover
+                            ShredSheetsCoverItem(
+                                product = product,
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .alpha(0.28f)
-                                    .blur(1.dp)
+                                    .alpha(0.30f)
+                                    .blur(1.dp),
+                                isReflection = true
                             )
 
                             // Vertical gradient mask creating realistic floor fade-out reflection
@@ -458,7 +737,7 @@ fun ShopScreen(
                         label = "dotWidth"
                     )
                     val dotColor by animateColorAsState(
-                        targetValue = if (isSelected) activeAccentColor else Color(0xFF475569),
+                        targetValue = if (isSelected) SHRED_SHEETS_CATALOG[index].badgeColor else Color(0xFF475569),
                         animationSpec = tween(150),
                         label = "dotColor"
                     )
@@ -565,7 +844,7 @@ fun ShopScreen(
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Medium
                             ),
-                            color = activeAccentColor,
+                            color = product.badgeColor,
                             textAlign = TextAlign.Center,
                             modifier = Modifier.padding(top = 2.dp, bottom = 12.dp)
                         )
@@ -649,7 +928,7 @@ fun ShopScreen(
                                 .testTag("shop_buy_amazon_button")
                                 .semantics {
                                     role = Role.Button
-                                    contentDescription = "Buy ${product.title} on Amazon for ${product.price}"
+                                    contentDescription = "Buy ${product.title} on Amazon.com for $9.99 USD"
                                 }
                         ) {
                             Row(
@@ -661,29 +940,40 @@ fun ShopScreen(
                                     text = "Buy on",
                                     style = MaterialTheme.typography.titleMedium.copy(
                                         fontWeight = FontWeight.Bold,
-                                        fontSize = 16.sp
+                                        fontSize = 15.sp
                                     ),
                                     color = Color(0xFF111111)
                                 )
-                                Spacer(modifier = Modifier.width(10.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
 
                                 // Official Amazon Logo
                                 Image(
                                     painter = painterResource(id = R.drawable.ic_amazon_logo),
-                                    contentDescription = "Amazon",
+                                    contentDescription = "Amazon.com",
                                     contentScale = ContentScale.Fit,
                                     modifier = Modifier
-                                        .height(26.dp)
-                                        .width(90.dp)
+                                        .height(24.dp)
+                                        .width(82.dp)
                                 )
 
                                 Spacer(modifier = Modifier.width(8.dp))
+
+                                Text(
+                                    text = "• $9.99 USD",
+                                    style = MaterialTheme.typography.titleMedium.copy(
+                                        fontWeight = FontWeight.Black,
+                                        fontSize = 15.sp
+                                    ),
+                                    color = Color(0xFF111111)
+                                )
+
+                                Spacer(modifier = Modifier.width(6.dp))
 
                                 Icon(
                                     imageVector = Icons.Default.OpenInNew,
                                     contentDescription = null,
                                     tint = Color(0xFF111111),
-                                    modifier = Modifier.size(17.dp)
+                                    modifier = Modifier.size(16.dp)
                                 )
                             }
                         }
@@ -702,7 +992,7 @@ fun ShopScreen(
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "Eligible for FREE Prime Fast Delivery • Ships Worldwide",
+                                text = "Available on Amazon.com • FREE Prime Fast Delivery",
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Normal

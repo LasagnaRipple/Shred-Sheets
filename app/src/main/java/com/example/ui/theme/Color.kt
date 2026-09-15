@@ -3,7 +3,7 @@ package com.example.ui.theme
 import androidx.compose.ui.graphics.Color
 
 // Vibrant Palette Core Theme Colors
-val VibrantVolt = Color(0xFFE2FF00) // Electric Neon Lime/Volt from design
+val VibrantVolt = Color(0xFFEDF8CE) // Subtle Pale Yellow (replaces former neon volt #E2FF00)
 val VibrantDarkBackground = Color(0xFF121212) // #121212
 val VibrantDarkSurface = Color(0xFF1A1A1A) // #1A1A1A
 val VibrantDarkCard = Color(0xFF2A2A2A) // #2A2A2A
@@ -64,7 +64,7 @@ val OutOfTuneRed = Color(0xFFFF3D71)
 val StringPluckActive = VibrantCyan
 
 // Shred Sheets Shared Design Tokens (Tuner, Metronome, Chords)
-val ShredBrandVolt = Color(0xFFE2FF00) // Brand yellow-green: headers, active states, glow
+val ShredBrandVolt = Color(0xFFEDF8CE) // Brand subtle yellow: headers, active states, glow
 val ShredCardSurface = Color(0xFF12140F) // #12140F: Dark card surface
 val ShredCardBorder = Color(0xFF2A2D22) // #2A2D22: Subtle card border
 val ShredMutedText = Color(0xFF8A8D78) // #8A8D78: Muted secondary text

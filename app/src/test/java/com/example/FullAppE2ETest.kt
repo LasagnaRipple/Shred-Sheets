@@ -318,6 +318,12 @@ class FullAppE2ETest {
 
         // Assert Shop title & Amazon CTA button exist
         composeTestRule.onNodeWithTag("shop_screen_title").assertExists()
+        val initialAccent = viewModel.settings.value.accentColor
+        composeTestRule.onNodeWithTag("shop_screen_title").performClick()
+        composeTestRule.waitForIdle()
+        val nextAccent = viewModel.settings.value.accentColor
+        org.junit.Assert.assertNotEquals(initialAccent, nextAccent)
+
         composeTestRule.onNodeWithTag("shop_product_pager").assertExists()
         composeTestRule.onNodeWithTag("shop_pager_dots").assertExists()
         composeTestRule.onNodeWithTag("shop_buy_amazon_button").assertExists()

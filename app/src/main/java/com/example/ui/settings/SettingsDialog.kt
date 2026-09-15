@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.PrivacyTip
 import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Vibration
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -59,6 +60,11 @@ import com.example.model.InstrumentRepository
 import com.example.model.InstrumentType
 import com.example.model.LocalizationManager
 import com.example.model.TuningMode
+import com.example.ui.theme.LocalIsDarkTheme
+import com.example.ui.theme.ShredCardBorder
+import com.example.ui.theme.ShredCardSurface
+import com.example.ui.theme.ShredMutedText
+import com.example.ui.theme.ShredPrimaryText
 
 @Composable
 fun SettingsDialog(
@@ -69,16 +75,22 @@ fun SettingsDialog(
     var showLanguagePicker by remember { mutableStateOf(false) }
     var showPrivacyPolicy by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
+    val isDark = LocalIsDarkTheme.current
+    val dialogSurface = if (isDark) ShredCardSurface else MaterialTheme.colorScheme.surface
+    val dialogBorder = if (isDark) ShredCardBorder else MaterialTheme.colorScheme.outlineVariant
+    val primaryText = if (isDark) Color.White else MaterialTheme.colorScheme.onSurface
+    val mutedText = if (isDark) Color(0xFFD4D4CE) else MaterialTheme.colorScheme.onSurfaceVariant
+    val primaryColor = MaterialTheme.colorScheme.primary
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(6.dp)
-                .clip(RoundedCornerShape(24.dp))
-                .border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(24.dp)),
+                .padding(4.dp)
+                .clip(RoundedCornerShape(20.dp))
+                .border(1.5.dp, dialogBorder, RoundedCornerShape(20.dp)),
             colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface
+                containerColor = dialogSurface
             )
         ) {
             val scrollState = rememberScrollState()
@@ -90,55 +102,77 @@ fun SettingsDialog(
                     .verticalScroll(scrollState),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Header
+                // Header with Settings Icon, Title and Close Button (matching other info popups)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = "Settings",
-                        style = MaterialTheme.typography.titleLarge.copy(
-                            fontWeight = FontWeight.Black
-                        ),
-                        color = MaterialTheme.colorScheme.primary
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = null,
+                            tint = primaryColor,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Text(
+                            text = "Settings",
+                            style = MaterialTheme.typography.titleLarge.copy(
+                                fontWeight = FontWeight.Black,
+                                fontSize = 19.sp
+                            ),
+                            color = primaryText
+                        )
+                    }
 
-                    IconButton(onClick = onDismiss) {
-                        Icon(imageVector = Icons.Default.Close, contentDescription = "Close")
+                    IconButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.testTag("close_settings_dialog_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Close",
+                            tint = mutedText
+                        )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
                 // --- THEME & ACCENT CUSTOMIZER ---
                 Text(
                     text = "Theme",
                     style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = mutedText,
                     modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(modifier = Modifier.height(6.dp))
 
-                val isDark = settings.colorMode == ColorMode.DARK
+                val isCurrentDark = settings.colorMode == ColorMode.DARK
 
+                // Segmented Pill Toggle: [ Dark 🌙 | Light ☀️ ] like loop screen
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(if (isCurrentDark) Color(0xFF0F141C) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
+                        .border(
+                            1.dp,
+                            if (isCurrentDark) Color(0xFF263242) else MaterialTheme.colorScheme.outlineVariant,
+                            RoundedCornerShape(999.dp)
+                        )
+                        .padding(3.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Dark Mode Button
+                    // Dark Mode Pill
                     Box(
                         modifier = Modifier
                             .weight(1f)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(
-                                if (isDark) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                            )
-                            .border(
-                                1.5.dp,
-                                if (isDark) MaterialTheme.colorScheme.primary else Color.Transparent,
-                                RoundedCornerShape(12.dp)
-                            )
+                            .clip(RoundedCornerShape(999.dp))
+                            .background(if (isCurrentDark) MaterialTheme.colorScheme.primary else Color.Transparent)
                             .clickable {
                                 if (settings.hapticsEnabled) {
                                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -152,24 +186,20 @@ fun SettingsDialog(
                     ) {
                         Text(
                             text = "Dark 🌙",
-                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                            color = if (isDark) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontWeight = if (isCurrentDark) FontWeight.Bold else FontWeight.SemiBold,
+                                fontSize = 14.sp
+                            ),
+                            color = Color.Black
                         )
                     }
 
-                    // Light Mode Button
+                    // Light Mode Pill
                     Box(
                         modifier = Modifier
                             .weight(1f)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(
-                                if (!isDark) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                            )
-                            .border(
-                                1.5.dp,
-                                if (!isDark) MaterialTheme.colorScheme.primary else Color.Transparent,
-                                RoundedCornerShape(12.dp)
-                            )
+                            .clip(RoundedCornerShape(999.dp))
+                            .background(if (!isCurrentDark) MaterialTheme.colorScheme.primary else Color.Transparent)
                             .clickable {
                                 if (settings.hapticsEnabled) {
                                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -183,8 +213,11 @@ fun SettingsDialog(
                     ) {
                         Text(
                             text = "Light ☀️",
-                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                            color = if (!isDark) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontWeight = if (!isCurrentDark) FontWeight.Bold else FontWeight.Medium,
+                                fontSize = 14.sp
+                            ),
+                            color = if (!isCurrentDark) MaterialTheme.colorScheme.onPrimary else if (isCurrentDark) Color(0xFF94A3B8) else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -200,7 +233,11 @@ fun SettingsDialog(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(imageVector = Icons.AutoMirrored.Filled.VolumeUp, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("In-Tune Sound Chime", fontWeight = FontWeight.Bold)
+                        Text(
+                            text = "In-Tune Sound Chime",
+                            fontWeight = FontWeight.Bold,
+                            color = primaryText
+                        )
                     }
                     Switch(
                         checked = settings.soundEffectsEnabled,
@@ -227,7 +264,11 @@ fun SettingsDialog(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(imageVector = Icons.Default.Vibration, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Haptic Feedback", fontWeight = FontWeight.Bold)
+                        Text(
+                            text = "Haptic Feedback",
+                            fontWeight = FontWeight.Bold,
+                            color = primaryText
+                        )
                     }
                     Switch(
                         checked = settings.hapticsEnabled,
@@ -272,7 +313,11 @@ fun SettingsDialog(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(imageVector = Icons.Default.Language, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Language", fontWeight = FontWeight.Bold)
+                            Text(
+                                text = "Language",
+                                fontWeight = FontWeight.Bold,
+                                color = primaryText
+                            )
                         }
                         Text(
                             text = "${currentLang.flagEmoji} ${currentLang.name}",
@@ -310,7 +355,11 @@ fun SettingsDialog(
                             tint = MaterialTheme.colorScheme.primary
                         )
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Privacy Policy", fontWeight = FontWeight.Bold)
+                        Text(
+                            text = "Privacy Policy",
+                            fontWeight = FontWeight.Bold,
+                            color = primaryText
+                        )
                     }
                 }
 
@@ -348,21 +397,54 @@ fun SettingsDialog(
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(8.dp)
-                    .clip(RoundedCornerShape(20.dp)),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                    .padding(4.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .border(1.5.dp, dialogBorder, RoundedCornerShape(20.dp)),
+                colors = CardDefaults.cardColors(containerColor = dialogSurface)
             ) {
                 Column(
-                    modifier = Modifier.padding(16.dp),
+                    modifier = Modifier.padding(20.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text(
-                        text = "🌐 Select Language",
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
-                        color = MaterialTheme.colorScheme.primary
-                    )
+                    // Header with Language Icon, Title and Close Button
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Language,
+                                contentDescription = null,
+                                tint = primaryColor,
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Text(
+                                text = "Select Language",
+                                style = MaterialTheme.typography.titleLarge.copy(
+                                    fontWeight = FontWeight.Black,
+                                    fontSize = 19.sp
+                                ),
+                                color = primaryText
+                            )
+                        }
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                        IconButton(
+                            onClick = { showLanguagePicker = false },
+                            modifier = Modifier.testTag("close_language_picker_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Close",
+                                tint = mutedText
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
 
                     LazyColumn(
                         modifier = Modifier
@@ -395,7 +477,7 @@ fun SettingsDialog(
                                         style = MaterialTheme.typography.bodyMedium.copy(
                                             fontWeight = if (isSelected) FontWeight.Black else FontWeight.Medium
                                         ),
-                                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                        color = if (isSelected) MaterialTheme.colorScheme.primary else primaryText
                                     )
                                     if (isSelected) {
                                         Text(text = "✅", fontSize = 14.sp)
@@ -420,15 +502,22 @@ fun SettingsDialog(
 fun PrivacyPolicyDialog(
     onDismiss: () -> Unit
 ) {
+    val isDark = LocalIsDarkTheme.current
+    val dialogSurface = if (isDark) ShredCardSurface else MaterialTheme.colorScheme.surface
+    val dialogBorder = if (isDark) ShredCardBorder else MaterialTheme.colorScheme.outlineVariant
+    val primaryText = if (isDark) Color.White else MaterialTheme.colorScheme.onSurface
+    val mutedText = if (isDark) Color(0xFFD4D4CE) else MaterialTheme.colorScheme.onSurfaceVariant
+    val primaryColor = MaterialTheme.colorScheme.primary
+
     Dialog(onDismissRequest = onDismiss) {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(6.dp)
-                .clip(RoundedCornerShape(24.dp))
-                .border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(24.dp)),
+                .padding(4.dp)
+                .clip(RoundedCornerShape(20.dp))
+                .border(1.5.dp, dialogBorder, RoundedCornerShape(20.dp)),
             colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface
+                containerColor = dialogSurface
             )
         ) {
             val scrollState = rememberScrollState()
@@ -440,31 +529,41 @@ fun PrivacyPolicyDialog(
                     .verticalScroll(scrollState),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Header
+                // Header with Security Icon, Title and Close Button
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
                         Icon(
                             imageVector = Icons.Default.Security,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
+                            tint = primaryColor,
                             modifier = Modifier.size(24.dp)
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = "Privacy Policy",
                             style = MaterialTheme.typography.titleLarge.copy(
-                                fontWeight = FontWeight.Black
+                                fontWeight = FontWeight.Black,
+                                fontSize = 19.sp
                             ),
-                            color = MaterialTheme.colorScheme.primary
+                            color = primaryText
                         )
                     }
 
-                    IconButton(onClick = onDismiss) {
-                        Icon(imageVector = Icons.Default.Close, contentDescription = "Close")
+                    IconButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.testTag("close_privacy_dialog_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Close",
+                            tint = mutedText
+                        )
                     }
                 }
 
@@ -555,6 +654,7 @@ private fun PolicySection(
     title: String,
     content: String
 ) {
+    val isDark = LocalIsDarkTheme.current
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -572,7 +672,7 @@ private fun PolicySection(
         Text(
             text = content,
             style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.5.sp, lineHeight = 17.sp),
-            color = MaterialTheme.colorScheme.onSurface
+            color = if (isDark) Color.White else MaterialTheme.colorScheme.onSurface
         )
     }
 }

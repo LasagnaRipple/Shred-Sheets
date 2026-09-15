@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -42,6 +43,11 @@ import com.example.model.InstrumentConfig
 import com.example.model.InstrumentRepository
 import com.example.model.InstrumentType
 import com.example.model.TuningMode
+import com.example.ui.theme.LocalIsDarkTheme
+import com.example.ui.theme.ShredCardBorder
+import com.example.ui.theme.ShredCardSurface
+import com.example.ui.theme.ShredMutedText
+import com.example.ui.theme.ShredPrimaryText
 
 @Composable
 fun InstrumentPickerDialog(
@@ -50,14 +56,21 @@ fun InstrumentPickerDialog(
     onDismiss: () -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
+    val isDark = LocalIsDarkTheme.current
+    val dialogSurface = if (isDark) ShredCardSurface else MaterialTheme.colorScheme.surface
+    val dialogBorder = if (isDark) ShredCardBorder else MaterialTheme.colorScheme.outlineVariant
+    val primaryText = if (isDark) ShredPrimaryText else MaterialTheme.colorScheme.onSurface
+    val mutedText = if (isDark) ShredMutedText else MaterialTheme.colorScheme.onSurfaceVariant
+    val primaryColor = MaterialTheme.colorScheme.primary
+
     Dialog(onDismissRequest = onDismiss) {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(8.dp)
-                .clip(RoundedCornerShape(24.dp))
-                .border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(24.dp)),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                .padding(4.dp)
+                .clip(RoundedCornerShape(20.dp))
+                .border(1.5.dp, dialogBorder, RoundedCornerShape(20.dp)),
+            colors = CardDefaults.cardColors(containerColor = dialogSurface)
         ) {
             Column(
                 modifier = Modifier
@@ -65,22 +78,44 @@ fun InstrumentPickerDialog(
                     .padding(20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                // Header with Info Icon, Title and Close Button (matching Chord Library style)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = "Select Instrument",
-                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Black),
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    IconButton(onClick = onDismiss) {
-                        Icon(imageVector = Icons.Default.Close, contentDescription = "Close")
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Info,
+                            contentDescription = null,
+                            tint = primaryColor,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Text(
+                            text = "Select Instrument",
+                            style = MaterialTheme.typography.titleLarge.copy(
+                                fontWeight = FontWeight.Black,
+                                fontSize = 19.sp
+                            ),
+                            color = primaryText
+                        )
+                    }
+                    IconButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.testTag("close_instrument_dialog_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Close",
+                            tint = mutedText
+                        )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
                 LazyColumn(
                     modifier = Modifier.fillMaxWidth(),
@@ -93,11 +128,15 @@ fun InstrumentPickerDialog(
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(14.dp))
                                 .background(
-                                    if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                    if (isSelected) primaryColor.copy(alpha = 0.15f)
+                                    else if (isDark) ShredCardBorder.copy(alpha = 0.25f)
+                                    else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                                 )
                                 .border(
-                                    1.5.dp,
-                                    if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                                    1.dp,
+                                    if (isSelected) primaryColor.copy(alpha = 0.7f)
+                                    else if (isDark) ShredCardBorder.copy(alpha = 0.5f)
+                                    else Color.Transparent,
                                     RoundedCornerShape(14.dp)
                                 )
                                 .clickable {
@@ -118,16 +157,16 @@ fun InstrumentPickerDialog(
                                     Text(
                                         text = inst.displayName,
                                         style = MaterialTheme.typography.bodyLarge.copy(
-                                            fontWeight = if (isSelected) FontWeight.Black else FontWeight.SemiBold
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold
                                         ),
-                                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                        color = if (isSelected) primaryColor else primaryText
                                     )
                                 }
                                 if (isSelected) {
                                     Icon(
                                         imageVector = Icons.Default.Check,
                                         contentDescription = "Selected",
-                                        tint = MaterialTheme.colorScheme.primary
+                                        tint = primaryColor
                                     )
                                 }
                             }
@@ -147,14 +186,21 @@ fun TuningPickerDialog(
     onDismiss: () -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
+    val isDark = LocalIsDarkTheme.current
+    val dialogSurface = if (isDark) ShredCardSurface else MaterialTheme.colorScheme.surface
+    val dialogBorder = if (isDark) ShredCardBorder else MaterialTheme.colorScheme.outlineVariant
+    val primaryText = if (isDark) ShredPrimaryText else MaterialTheme.colorScheme.onSurface
+    val mutedText = if (isDark) ShredMutedText else MaterialTheme.colorScheme.onSurfaceVariant
+    val primaryColor = MaterialTheme.colorScheme.primary
+
     Dialog(onDismissRequest = onDismiss) {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(8.dp)
-                .clip(RoundedCornerShape(24.dp))
-                .border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(24.dp)),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                .padding(4.dp)
+                .clip(RoundedCornerShape(20.dp))
+                .border(1.5.dp, dialogBorder, RoundedCornerShape(20.dp)),
+            colors = CardDefaults.cardColors(containerColor = dialogSurface)
         ) {
             Column(
                 modifier = Modifier
@@ -162,29 +208,51 @@ fun TuningPickerDialog(
                     .padding(20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                // Header with Info Icon, Title and Close Button (matching Chord Library style)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = "Tuning Modes",
-                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Black),
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    IconButton(onClick = onDismiss) {
-                        Icon(imageVector = Icons.Default.Close, contentDescription = "Close")
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Info,
+                            contentDescription = null,
+                            tint = primaryColor,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Text(
+                            text = "Tuning Modes",
+                            style = MaterialTheme.typography.titleLarge.copy(
+                                fontWeight = FontWeight.Black,
+                                fontSize = 19.sp
+                            ),
+                            color = primaryText
+                        )
+                    }
+                    IconButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.testTag("close_tuning_dialog_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Close",
+                            tint = mutedText
+                        )
                     }
                 }
 
                 Text(
                     text = "Supports standard, drop, open, and rock tunings",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.fillMaxWidth()
+                    color = mutedText,
+                    modifier = Modifier.fillMaxWidth().padding(top = 2.dp)
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
                 LazyColumn(
                     modifier = Modifier.fillMaxWidth(),
@@ -197,11 +265,15 @@ fun TuningPickerDialog(
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(14.dp))
                                 .background(
-                                    if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                    if (isSelected) primaryColor.copy(alpha = 0.15f)
+                                    else if (isDark) ShredCardBorder.copy(alpha = 0.25f)
+                                    else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                                 )
                                 .border(
-                                    1.5.dp,
-                                    if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                                    1.dp,
+                                    if (isSelected) primaryColor.copy(alpha = 0.7f)
+                                    else if (isDark) ShredCardBorder.copy(alpha = 0.5f)
+                                    else Color.Transparent,
                                     RoundedCornerShape(14.dp)
                                 )
                                 .clickable {
@@ -220,16 +292,16 @@ fun TuningPickerDialog(
                                     Text(
                                         text = tuning.name,
                                         style = MaterialTheme.typography.bodyLarge.copy(
-                                            fontWeight = if (isSelected) FontWeight.Black else FontWeight.SemiBold
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold
                                         ),
-                                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                        color = if (isSelected) primaryColor else primaryText
                                     )
                                 }
                                 if (isSelected) {
                                     Icon(
                                         imageVector = Icons.Default.Check,
                                         contentDescription = "Selected",
-                                        tint = MaterialTheme.colorScheme.primary
+                                        tint = primaryColor
                                     )
                                 }
                             }

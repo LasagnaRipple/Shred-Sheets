@@ -211,6 +211,7 @@ fun MainAppContent(
                     settings.copy(colorMode = colorMode, accentColor = accentColor)
                 )
             },
+            onThemeToggle = { viewModel.toggleTheme(isDark) },
             onComplete = { completedSettings ->
                 viewModel.completeOnboarding(completedSettings)
                 if (!hasMicPermission) {
@@ -326,6 +327,7 @@ fun MainAppContent(
 
                         AppTab.SHOP -> {
                             ShopScreen(
+                                onThemeToggle = { viewModel.toggleTheme(isDark) },
                                 modifier = Modifier.fillMaxSize()
                             )
                         }

@@ -10,7 +10,7 @@ enum class AccentColor(
     val darkAllowed: Boolean,
     val lightAllowed: Boolean
 ) {
-    YELLOW("yellow", "Yellow", "🟡", Color(0xFFE2FF00), darkAllowed = true, lightAllowed = false),
+    YELLOW("yellow", "Yellow", "🟡", Color(0xFFEDF8CE), darkAllowed = true, lightAllowed = false),
     ORANGE("orange", "Orange", "🟠", Color(0xFFFF6D00), darkAllowed = true, lightAllowed = true),
     PURPLE("purple", "Purple", "🟣", Color(0xFFB537F2), darkAllowed = true, lightAllowed = true),
     GREEN("green", "Green", "🟢", Color(0xFF00E676), darkAllowed = true, lightAllowed = true),

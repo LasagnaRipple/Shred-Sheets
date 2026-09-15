@@ -754,7 +754,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun setDrumStyle(style: com.example.model.DrumStyle) {
-        _drumStyle.value = style
+        _drumStyle.value = com.example.model.DrumStyle.ROCK
     }
 
     fun toggleMetronome() {
