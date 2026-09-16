@@ -230,8 +230,17 @@ fun ShakaVisualizer(
     val (badgeText, badgeTextColor, badgeBg) = when (debouncedState) {
         CircleTunerState.READY -> {
             val text = if (!isTunerActive) "Tap to start" else "Pluck a string"
-            val textColor = if (isDark) Color(0xFF8A8D78) else MaterialTheme.colorScheme.onSurfaceVariant
-            Triple(text, textColor, Color.Transparent)
+            val textColor = if (!isTunerActive) {
+                if (isDark) accentColor else MaterialTheme.colorScheme.primary
+            } else {
+                if (isDark) Color(0xFF8A8D78) else MaterialTheme.colorScheme.onSurfaceVariant
+            }
+            val bg = if (!isTunerActive) {
+                if (isDark) accentColor.copy(alpha = 0.18f) else accentColor.copy(alpha = 0.12f)
+            } else {
+                Color.Transparent
+            }
+            Triple(text, textColor, bg)
         }
         CircleTunerState.EXTREME_FLAT -> {
             val textColor = if (isDark) Color(0xFFFFA285) else Color(0xFF7F1D1D)

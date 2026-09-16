@@ -108,49 +108,6 @@ fun TunerScreen(
     val isDark = LocalIsDarkTheme.current
     val coroutineScope = rememberCoroutineScope()
 
-    // ========== DEV MODE (Easily removable for Google Play store release) ==========
-    var isDevModeEnabled by remember { mutableStateOf(false) }
-    var devCentsOffset by remember { mutableFloatStateOf(0f) }
-    var devHasSignal by remember { mutableStateOf(true) }
-    var devAllStringsTuned by remember { mutableStateOf(false) }
-    var devStringConfirmed by remember { mutableStateOf(false) }
-
-    val effectivePitchResult = remember(isDevModeEnabled, devCentsOffset, devHasSignal, selectedString, pitchResult) {
-        if (isDevModeEnabled) {
-            if (devHasSignal) {
-                val targetFreq = selectedString?.targetFrequency ?: 82.41
-                val targetNote = selectedString?.noteName ?: "E2"
-                val targetLetter = selectedString?.noteLetter ?: "E"
-                val targetOctave = selectedString?.octave ?: 2
-                val cents = devCentsOffset.toDouble()
-                val simFreq = targetFreq * 2.0.pow(cents / 1200.0)
-                val inTune = kotlin.math.abs(cents) <= MusicalPitchHelper.IN_TUNE_TOLERANCE_CENTS
-                val close = kotlin.math.abs(cents) <= MusicalPitchHelper.CLOSE_TOLERANCE_CENTS
-                PitchResult(
-                    frequency = simFreq,
-                    noteName = targetNote,
-                    noteLetter = targetLetter,
-                    octave = targetOctave,
-                    targetFrequency = targetFreq,
-                    centsDiff = cents,
-                    isInTune = inTune,
-                    isClose = close,
-                    amplitude = 0.9,
-                    confidence = 0.99
-                )
-            } else {
-                PitchResult.EMPTY
-            }
-        } else {
-            pitchResult
-        }
-    }
-
-    val effectiveHasSignal = if (isDevModeEnabled) devHasSignal else hasSignal
-    val effectiveTunerActive = if (isDevModeEnabled) true else isTunerActive
-    val effectiveAllStringsTuned = if (isDevModeEnabled) devAllStringsTuned else isAllStringsTuned
-    val effectiveStringConfirmed = if (isDevModeEnabled) devStringConfirmed else isStringConfirmed
-
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -172,14 +129,6 @@ fun TunerScreen(
             isAutoMode = isAutoMode,
             onToggleAutoMode = onToggleAutoMode
         )
-
-        /*
-        // Dev Mode Banner & Toggle Button (Easily re-enabled by uncommenting)
-        TunerDevModeBanner(
-            isDevModeEnabled = isDevModeEnabled,
-            onToggleDevMode = { isDevModeEnabled = !isDevModeEnabled }
-        )
-        */
 
         // Mic Permission Prompt Banner if needed
         if (!hasMicrophonePermission) {
@@ -223,13 +172,13 @@ fun TunerScreen(
             contentAlignment = Alignment.Center
         ) {
             ShakaVisualizer(
-                pitchResult = effectivePitchResult,
-                hasSignal = effectiveHasSignal,
+                pitchResult = pitchResult,
+                hasSignal = hasSignal,
                 primaryColor = MaterialTheme.colorScheme.primary,
                 accentColor = MaterialTheme.colorScheme.primary,
-                isTunerActive = effectiveTunerActive,
-                isAllStringsTuned = effectiveAllStringsTuned,
-                isStringConfirmed = effectiveStringConfirmed,
+                isTunerActive = isTunerActive,
+                isAllStringsTuned = isAllStringsTuned,
+                isStringConfirmed = isStringConfirmed,
                 promptNextString = promptNextString,
                 instrumentEmoji = instrumentType.iconName,
                 instrumentType = instrumentType,
@@ -243,37 +192,16 @@ fun TunerScreen(
 
         // Real-Time Pitch Meter & Cents Arc
         PitchMeter(
-            pitchResult = effectivePitchResult,
-            hasSignal = effectiveHasSignal,
-            isTunerActive = effectiveTunerActive,
+            pitchResult = pitchResult,
+            hasSignal = hasSignal,
+            isTunerActive = isTunerActive,
             promptNextString = promptNextString,
-            isAllStringsTuned = effectiveAllStringsTuned,
+            isAllStringsTuned = isAllStringsTuned,
             onStatusClick = onToggleTunerActive,
             stringCount = tuningMode.strings.size,
             pluckAnimationEvent = pluckAnimationEvent,
             modifier = Modifier.fillMaxWidth()
         )
-
-        /*
-        // Dev Mode Controls (Slider, Presets, Signal & Animation Triggers)
-        if (isDevModeEnabled) {
-            TunerDevControlsCard(
-                centsOffset = devCentsOffset,
-                onCentsChange = { devCentsOffset = it },
-                hasSignal = devHasSignal,
-                onToggleHasSignal = { devHasSignal = !devHasSignal },
-                isAllStringsTuned = devAllStringsTuned,
-                onToggleAllStringsTuned = { devAllStringsTuned = !devAllStringsTuned },
-                onTriggerLockInBurst = {
-                    coroutineScope.launch {
-                        devStringConfirmed = true
-                        delay(600)
-                        devStringConfirmed = false
-                    }
-                }
-            )
-        }
-        */
 
         Spacer(modifier = Modifier.height(12.dp))
 

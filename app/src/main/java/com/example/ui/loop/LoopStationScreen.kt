@@ -241,10 +241,9 @@ fun LoopStationScreen(
     // Dialog & Sheet States
     var showInfoDialog by remember { mutableStateOf(false) }
     var showTimeSigDialog by remember { mutableStateOf(false) }
+    var showDeleteAndResetDialog by remember { mutableStateOf(false) }
     var activeSheetTrackIndex by remember { mutableStateOf<Int?>(null) }
     var isExporting by remember { mutableStateOf(false) }
-    var showBackingVolumePopup by remember { mutableStateOf(false) }
-    var lastVolumeDismissTime by remember { mutableStateOf(0L) }
 
     Column(
         modifier = modifier
@@ -529,108 +528,45 @@ fun LoopStationScreen(
                     }
                 }
 
-                // Subtle Divider line
-                Box(
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Compact Play / Stop Button inside Tempo component
+                Button(
+                    onClick = {
+                        triggerStrongTick()
+                        viewModel.toggleMetronome()
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 16.dp, bottom = 14.dp)
-                        .height(1.dp)
-                        .background(if (isDark) Color(0xFF242C3D) else Color(0xFFE2E8F0))
-                )
-
-                // Row 3: Time Signature (Left) & Bars in Loop (Right)
-                val timeSigLabel = when (timeSignature) {
-                    2 -> "2/4"
-                    3 -> "3/4"
-                    4 -> "4/4"
-                    6 -> "6/8"
-                    else -> "$timeSignature/4"
-                }
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                        .height(42.dp)
+                        .testTag("loop_backing_play_button"),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = activeAccentColor,
+                        contentColor = Color.Black
+                    ),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp, pressedElevation = 2.dp)
                 ) {
-                    // Left: Time signature
-                    Column(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .clickable {
-                                triggerStrongTick()
-                                showTimeSigDialog = true
-                            }
-                            .padding(4.dp)
-                            .semantics {
-                                role = Role.Button
-                                contentDescription = "Time signature $timeSigLabel. Tap to change."
-                            }
-                            .testTag("loop_time_signature_button")
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
                     ) {
-                        Text(
-                            text = "Time signature",
-                            style = MaterialTheme.typography.bodySmall.copy(
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Normal
-                            ),
-                            color = if (isDark) Color(0xFF94A3B8) else MaterialTheme.colorScheme.onSurfaceVariant
+                        Icon(
+                            imageVector = if (isPlaying) Icons.Default.Stop else Icons.Default.PlayArrow,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                            tint = Color.Black
                         )
-                        Spacer(modifier = Modifier.height(2.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = timeSigLabel,
-                            style = MaterialTheme.typography.titleMedium.copy(
+                            text = if (isPlaying) "Stop" else "Play",
+                            style = MaterialTheme.typography.titleSmall.copy(
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 18.sp
+                                fontSize = 15.sp
                             ),
-                            color = if (isDark) Color.White else MaterialTheme.colorScheme.onSurface
+                            color = Color.Black
                         )
-                    }
-
-                    // Right: Bars in loop
-                    Column(
-                        horizontalAlignment = Alignment.End,
-                        modifier = Modifier.padding(4.dp)
-                    ) {
-                        Text(
-                            text = "Bars in loop",
-                            style = MaterialTheme.typography.bodySmall.copy(
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Normal
-                            ),
-                            color = if (isDark) Color(0xFF94A3B8) else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-
-                        // 4 Bars dots (First dot active or current playing bar active)
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            modifier = Modifier.testTag("loop_bar_indicator")
-                        ) {
-                            for (bar in 0 until totalBars) {
-                                val isLit = if (isPlaying) {
-                                    currentBarIndex == bar
-                                } else {
-                                    bar == 0
-                                }
-
-                                if (isLit) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(10.dp)
-                                            .clip(CircleShape)
-                                            .background(activeAccentColor)
-                                    )
-                                } else {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(10.dp)
-                                            .clip(CircleShape)
-                                            .border(1.5.dp, if (isDark) Color(0xFF475569) else Color(0xFF94A3B8), CircleShape)
-                                    )
-                                }
-                            }
-                        }
                     }
                 }
             }
@@ -663,8 +599,8 @@ fun LoopStationScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 14.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // Segmented Pill: [Click | Drums]
@@ -673,7 +609,7 @@ fun LoopStationScreen(
                         .clip(RoundedCornerShape(999.dp))
                         .background(if (isDark) Color(0xFF0F141C) else MaterialTheme.colorScheme.surface)
                         .border(1.dp, if (isDark) Color(0xFF263242) else MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(999.dp))
-                        .padding(3.dp),
+                        .padding(2.5.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     val isClick = soundMode == MetronomeSoundMode.CLICK
@@ -685,7 +621,7 @@ fun LoopStationScreen(
                                 triggerStrongTick()
                                 viewModel.setMetronomeSoundMode(MetronomeSoundMode.CLICK)
                             }
-                            .padding(horizontal = 18.dp, vertical = 8.dp)
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
                             .testTag("loop_sound_mode_click"),
                         contentAlignment = Alignment.Center
                     ) {
@@ -693,7 +629,7 @@ fun LoopStationScreen(
                             text = "Click",
                             style = MaterialTheme.typography.labelMedium.copy(
                                 fontWeight = if (isClick) FontWeight.Bold else FontWeight.Medium,
-                                fontSize = 14.sp
+                                fontSize = 13.sp
                             ),
                             color = if (isClick) Color.Black else if (isDark) Color(0xFF94A3B8) else MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -708,7 +644,7 @@ fun LoopStationScreen(
                                 triggerStrongTick()
                                 viewModel.setMetronomeSoundMode(MetronomeSoundMode.DRUMS)
                             }
-                            .padding(horizontal = 18.dp, vertical = 8.dp)
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
                             .testTag("loop_sound_mode_drums"),
                         contentAlignment = Alignment.Center
                     ) {
@@ -716,216 +652,191 @@ fun LoopStationScreen(
                             text = "Drums",
                             style = MaterialTheme.typography.labelMedium.copy(
                                 fontWeight = if (isDrums) FontWeight.Bold else FontWeight.Medium,
-                                fontSize = 14.sp
+                                fontSize = 13.sp
                             ),
                             color = if (isDrums) Color.Black else if (isDark) Color(0xFF94A3B8) else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
 
-                // Volume Button + Popup Slider
-                Box {
-                    Row(
+                // Inline Horizontal Volume Control: Icon + Slider + %
+                val volPct = (backingVolume * 100).roundToInt()
+                val iconVector = when {
+                    volPct == 0 -> Icons.Default.VolumeMute
+                    backingVolume < 0.5f -> Icons.Default.VolumeDown
+                    else -> Icons.Default.VolumeUp
+                }
+
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(start = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Icon(
+                        imageVector = iconVector,
+                        contentDescription = "Backing volume",
+                        tint = if (volPct > 0) activeAccentColor else if (isDark) Color(0xFF64748B) else Color(0xFF94A3B8),
                         modifier = Modifier
-                            .clip(RoundedCornerShape(10.dp))
-                            .clickable {
+                            .size(19.dp)
+                            .testTag("loop_backing_volume_icon")
+                    )
+
+                    Slider(
+                        value = backingVolume,
+                        onValueChange = { newVol ->
+                            val oldStep = (backingVolume * 20).roundToInt()
+                            val newStep = (newVol * 20).roundToInt()
+                            if (oldStep != newStep) {
                                 triggerStrongTick()
-                                val now = System.currentTimeMillis()
-                                if (showBackingVolumePopup) {
-                                    showBackingVolumePopup = false
-                                    lastVolumeDismissTime = now
-                                } else {
-                                    if (now - lastVolumeDismissTime > 280L) {
-                                        showBackingVolumePopup = true
-                                    } else {
-                                        showBackingVolumePopup = false
-                                    }
-                                }
                             }
-                            .padding(horizontal = 10.dp, vertical = 6.dp)
-                            .testTag("loop_backing_volume_button"),
-                        verticalAlignment = Alignment.CenterVertically
+                            viewModel.setBackingVolume(newVol)
+                        },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(24.dp)
+                            .testTag("loop_backing_volume_slider"),
+                        colors = SliderDefaults.colors(
+                            thumbColor = activeAccentColor,
+                            activeTrackColor = activeAccentColor,
+                            inactiveTrackColor = if (isDark) Color(0xFF334155) else Color(0xFFE2E8F0)
+                        )
+                    )
+
+                    Text(
+                        text = "$volPct%",
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp
+                        ),
+                        color = if (isDark) Color.White else MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.width(36.dp)
+                    )
+                }
+            }
+        }
+
+        // --- SECTION 3: TIMING ---
+        Text(
+            text = "TIMING",
+            style = MaterialTheme.typography.labelSmall.copy(
+                fontWeight = FontWeight.Bold,
+                fontSize = 11.sp,
+                letterSpacing = 1.2.sp
+            ),
+            color = if (isDark) Color(0xFF6B7280) else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 4.dp, top = 16.dp, bottom = 8.dp)
+        )
+
+        // --- Time Signature & Bars in loop ---
+        val timeSigLabel = when (timeSignature) {
+            2 -> "2/4"
+            3 -> "3/4"
+            4 -> "4/4"
+            6 -> "6/8"
+            else -> "$timeSignature/4"
+        }
+
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(18.dp))
+                .border(1.dp, if (isDark) Color(0xFF263242) else cardBorder, RoundedCornerShape(18.dp)),
+            colors = CardDefaults.cardColors(
+                containerColor = if (isDark) Color(0xFF161B22) else cardBg
+            )
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Left: Time signature
+                Column(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable {
+                            triggerStrongTick()
+                            showTimeSigDialog = true
+                        }
+                        .padding(4.dp)
+                        .semantics {
+                            role = Role.Button
+                            contentDescription = "Time signature $timeSigLabel. Tap to change."
+                        }
+                        .testTag("loop_time_signature_button")
+                ) {
+                    Text(
+                        text = "Time signature",
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Normal
+                        ),
+                        color = if (isDark) Color(0xFF94A3B8) else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = timeSigLabel,
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp
+                        ),
+                        color = if (isDark) Color.White else MaterialTheme.colorScheme.onSurface
+                    )
+                }
+
+                // Right: Bars in loop
+                Column(
+                    horizontalAlignment = Alignment.End,
+                    modifier = Modifier.padding(4.dp)
+                ) {
+                    Text(
+                        text = "Bars in loop",
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Normal
+                        ),
+                        color = if (isDark) Color(0xFF94A3B8) else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    // 4 Bars dots (First dot active or current playing bar active)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.testTag("loop_bar_indicator")
                     ) {
-                        val isVolumeActive = (backingVolume * 100).roundToInt() > 0
-                        Icon(
-                            imageVector = if (!isVolumeActive) Icons.Default.VolumeMute else if (backingVolume < 0.5f) Icons.Default.VolumeDown else Icons.Default.VolumeUp,
-                            contentDescription = "Backing volume",
-                            tint = if (isVolumeActive) activeAccentColor else if (isDark) Color(0xFF94A3B8) else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "${(backingVolume * 100).roundToInt()}%",
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp
-                            ),
-                            color = if (isDark) Color.White else MaterialTheme.colorScheme.onSurface
-                        )
-                    }
+                        for (bar in 0 until totalBars) {
+                            val isLit = if (isPlaying) {
+                                currentBarIndex == bar
+                            } else {
+                                bar == 0
+                            }
 
-                    // Dropdown vertical slider Popup when tapped
-                    if (showBackingVolumePopup) {
-                        val offsetYPx = with(density) { 42.dp.roundToPx() }
-                        Popup(
-                            alignment = Alignment.TopEnd,
-                            offset = IntOffset(0, offsetYPx),
-                            onDismissRequest = {
-                                lastVolumeDismissTime = System.currentTimeMillis()
-                                showBackingVolumePopup = false
-                            },
-                            properties = PopupProperties(
-                                focusable = false,
-                                dismissOnClickOutside = true,
-                                dismissOnBackPress = true
-                            )
-                        ) {
-                            Card(
-                                modifier = Modifier
-                                    .width(76.dp)
-                                    .clip(RoundedCornerShape(16.dp))
-                                    .border(1.5.dp, activeAccentColor, RoundedCornerShape(16.dp)),
-                                colors = CardDefaults.cardColors(
-                                    containerColor = if (isDark) Color(0xFF0F172A) else MaterialTheme.colorScheme.surface
-                                ),
-                                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
-                            ) {
-                                Column(
+                            if (isLit) {
+                                Box(
                                     modifier = Modifier
-                                        .padding(vertical = 12.dp, horizontal = 10.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally
-                                ) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(
-                                            text = "${(backingVolume * 100).roundToInt()}%",
-                                            style = MaterialTheme.typography.labelSmall.copy(
-                                                fontWeight = FontWeight.Black,
-                                                fontSize = 11.sp
-                                            ),
-                                            color = activeAccentColor
-                                        )
-                                        Icon(
-                                            imageVector = Icons.Default.Close,
-                                            contentDescription = "Close volume slider",
-                                            tint = if (isDark) Color(0xFF94A3B8) else MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier
-                                                .size(14.dp)
-                                                .clickable {
-                                                    triggerStrongTick()
-                                                    showBackingVolumePopup = false
-                                                    lastVolumeDismissTime = System.currentTimeMillis()
-                                                }
-                                        )
-                                    }
-
-                                    Spacer(modifier = Modifier.height(6.dp))
-
-                                    // Vertical Volume Track
-                                    val sliderHeight = 130.dp
-                                    Box(
-                                        modifier = Modifier
-                                            .width(36.dp)
-                                            .height(sliderHeight)
-                                            .testTag("loop_backing_volume_slider")
-                                            .pointerInput(Unit) {
-                                                detectTapGestures { offset ->
-                                                    val fraction = (1f - (offset.y / size.height)).coerceIn(0f, 1f)
-                                                    val oldVal = (backingVolume * 20).roundToInt()
-                                                    val newVal = (fraction * 20).roundToInt()
-                                                    if (oldVal != newVal) triggerStrongTick()
-                                                    viewModel.setBackingVolume(fraction)
-                                                }
-                                            }
-                                            .pointerInput(Unit) {
-                                                detectDragGestures { change, _ ->
-                                                    change.consume()
-                                                    val fraction = (1f - (change.position.y / size.height)).coerceIn(0f, 1f)
-                                                    val oldVal = (backingVolume * 20).roundToInt()
-                                                    val newVal = (fraction * 20).roundToInt()
-                                                    if (oldVal != newVal) triggerStrongTick()
-                                                    viewModel.setBackingVolume(fraction)
-                                                }
-                                            },
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Canvas(modifier = Modifier.fillMaxSize()) {
-                                            val trackWidth = 6.dp.toPx()
-                                            val cornerRadius = 3.dp.toPx()
-                                            val centerX = size.width / 2f
-                                            val h = size.height
-
-                                            // Background rail
-                                            drawRoundRect(
-                                                color = if (isDark) Color(0xFF334155) else Color(0xFFE2E8F0),
-                                                topLeft = Offset(centerX - trackWidth / 2f, 0f),
-                                                size = Size(trackWidth, h),
-                                                cornerRadius = androidx.compose.ui.geometry.CornerRadius(cornerRadius, cornerRadius)
-                                            )
-
-                                            // Active fill from bottom
-                                            val activeHeight = h * backingVolume
-                                            val activeTop = h - activeHeight
-                                            drawRoundRect(
-                                                color = activeAccentColor,
-                                                topLeft = Offset(centerX - trackWidth / 2f, activeTop),
-                                                size = Size(trackWidth, activeHeight),
-                                                cornerRadius = androidx.compose.ui.geometry.CornerRadius(cornerRadius, cornerRadius)
-                                            )
-
-                                            // Thumb circle ring matching metronome
-                                            val thumbY = activeTop.coerceIn(8.dp.toPx(), h - 8.dp.toPx())
-                                            drawCircle(
-                                                color = if (isDark) Color(0xFF0F172A) else Color.White,
-                                                radius = 9.dp.toPx(),
-                                                center = Offset(centerX, thumbY)
-                                            )
-                                            drawCircle(
-                                                color = activeAccentColor,
-                                                radius = 9.dp.toPx(),
-                                                center = Offset(centerX, thumbY),
-                                                style = Stroke(width = 2.5.dp.toPx())
-                                            )
-                                        }
-                                    }
-                                }
+                                        .size(10.dp)
+                                        .clip(CircleShape)
+                                        .background(activeAccentColor)
+                                )
+                            } else {
+                                Box(
+                                    modifier = Modifier
+                                        .size(10.dp)
+                                        .clip(CircleShape)
+                                        .border(1.5.dp, if (isDark) Color(0xFF475569) else Color(0xFF94A3B8), CircleShape)
+                                )
                             }
                         }
                     }
                 }
             }
-        }
-
-        Spacer(modifier = Modifier.height(14.dp))
-
-        // --- PRIMARY ACTION BUTTON: PLAY / STOP ---
-        Button(
-            onClick = {
-                triggerStrongTick()
-                viewModel.toggleMetronome()
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(54.dp)
-                .testTag("loop_backing_play_button"),
-            shape = RoundedCornerShape(22.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = activeAccentColor,
-                contentColor = Color.Black
-            ),
-            elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp, pressedElevation = 2.dp)
-        ) {
-            Text(
-                text = if (isPlaying) "Stop" else "Play",
-                style = MaterialTheme.typography.titleMedium.copy(
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp
-                ),
-                color = Color.Black
-            )
         }
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -1305,7 +1216,49 @@ fun LoopStationScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // --- BUTTON: DELETE AND RESET ---
+        Button(
+            onClick = {
+                triggerStrongTick()
+                showDeleteAndResetDialog = true
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp)
+                .testTag("loop_delete_and_reset_button"),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = if (isDark) Color(0xFF231317) else Color(0xFFFEE2E2),
+                contentColor = if (isDark) Color(0xFFF87171) else Color(0xFFDC2626)
+            ),
+            border = BorderStroke(1.dp, if (isDark) Color(0xFF7F1D1D).copy(alpha = 0.7f) else Color(0xFFFCA5A5)),
+            shape = RoundedCornerShape(14.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                    tint = if (isDark) Color(0xFFF87171) else Color(0xFFDC2626)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Delete and Reset",
+                    style = MaterialTheme.typography.titleSmall.copy(
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp
+                    ),
+                    color = if (isDark) Color(0xFFF87171) else Color(0xFFDC2626)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(28.dp))
     }
 
     // --- DIALOGS & BOTTOM SHEETS ---
@@ -1603,6 +1556,383 @@ fun LoopStationScreen(
             }
         }
     }
+
+    // 4. Delete and Reset Confirmation Dialog
+    if (showDeleteAndResetDialog) {
+        val dialogSurface = if (isDark) ShredCardSurface else MaterialTheme.colorScheme.surface
+        val dialogBorder = if (isDark) ShredCardBorder else MaterialTheme.colorScheme.outlineVariant
+        val primaryText = if (isDark) ShredPrimaryText else MaterialTheme.colorScheme.onSurface
+        val mutedText = if (isDark) ShredMutedText else MaterialTheme.colorScheme.onSurfaceVariant
+
+        Dialog(onDismissRequest = { showDeleteAndResetDialog = false }) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(4.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .border(1.5.dp, dialogBorder, RoundedCornerShape(20.dp))
+                    .testTag("delete_and_reset_dialog"),
+                colors = CardDefaults.cardColors(containerColor = dialogSurface)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "Delete and Reset",
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp
+                        ),
+                        color = primaryText
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Text(
+                        text = "Are you sure? All recordings will be deleted and settings will reset.",
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontSize = 14.5.sp,
+                            lineHeight = 20.sp
+                        ),
+                        textAlign = TextAlign.Center,
+                        color = mutedText
+                    )
+
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                triggerStrongTick()
+                                showDeleteAndResetDialog = false
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(44.dp)
+                                .testTag("confirm_delete_and_reset_no"),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (isDark) Color(0xFF242C3D) else Color(0xFFE2E8F0),
+                                contentColor = if (isDark) Color.White else MaterialTheme.colorScheme.onSurface
+                            ),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text(
+                                text = "No",
+                                fontWeight = FontWeight.SemiBold,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+
+                        Button(
+                            onClick = {
+                                triggerStrongTick()
+                                viewModel.resetLoopStation()
+                                showDeleteAndResetDialog = false
+                                Toast.makeText(context, "All recordings deleted and settings reset", Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(44.dp)
+                                .testTag("confirm_delete_and_reset_yes"),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFFDC2626),
+                                contentColor = Color.White
+                            ),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text(
+                                text = "Yes",
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Reusable volume pill button with drop-down vertical slider popup.
+ * Used in both the Backing Sound card and the individual Track record cards.
+ */
+@Composable
+private fun LoopVolumeControl(
+    volume: Float,
+    onVolumeChange: (Float) -> Unit,
+    activeAccentColor: Color,
+    isDark: Boolean,
+    modifier: Modifier = Modifier,
+    isMuted: Boolean = false,
+    onToggleMute: (() -> Unit)? = null,
+    testTagButton: String = "loop_volume_button",
+    testTagSlider: String = "loop_volume_slider",
+    contentDescription: String = "Volume",
+    compact: Boolean = false
+) {
+    var showPopup by remember { mutableStateOf(false) }
+    var lastDismissTime by remember { mutableStateOf(0L) }
+    val density = LocalDensity.current
+    val haptic = LocalHapticFeedback.current
+
+    val volPct = (volume * 100).roundToInt()
+    val isAudible = !isMuted && volPct > 0
+
+    val iconTint = when {
+        isMuted -> if (isDark) Color(0xFF64748B) else Color(0xFF94A3B8)
+        !isAudible -> if (isDark) Color(0xFF64748B) else Color(0xFF94A3B8)
+        else -> activeAccentColor
+    }
+
+    val iconVector = when {
+        isMuted -> Icons.Default.VolumeOff
+        volPct == 0 -> Icons.Default.VolumeMute
+        volume < 0.5f -> Icons.Default.VolumeDown
+        else -> Icons.Default.VolumeUp
+    }
+
+    Box(modifier = modifier) {
+        // Pill Button
+        Row(
+            modifier = Modifier
+                .clip(RoundedCornerShape(8.dp))
+                .background(
+                    if (showPopup) activeAccentColor.copy(alpha = 0.15f)
+                    else Color.Transparent
+                )
+                .clickable {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    val now = System.currentTimeMillis()
+                    if (showPopup) {
+                        showPopup = false
+                        lastDismissTime = now
+                    } else {
+                        if (now - lastDismissTime > 250L) {
+                            showPopup = true
+                        } else {
+                            showPopup = false
+                        }
+                    }
+                }
+                .padding(
+                    horizontal = if (compact) 6.dp else 10.dp,
+                    vertical = if (compact) 4.dp else 6.dp
+                )
+                .testTag(testTagButton),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = iconVector,
+                contentDescription = contentDescription,
+                tint = iconTint,
+                modifier = Modifier.size(if (compact) 18.dp else 20.dp)
+            )
+            Spacer(modifier = Modifier.width(if (compact) 4.dp else 6.dp))
+            Text(
+                text = if (isMuted) "Mute" else "$volPct%",
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontWeight = FontWeight.Bold,
+                    fontSize = if (compact) 12.5.sp else 14.sp
+                ),
+                color = when {
+                    isMuted -> if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B)
+                    isAudible -> if (isDark) Color.White else MaterialTheme.colorScheme.onSurface
+                    else -> if (isDark) Color(0xFF94A3B8) else MaterialTheme.colorScheme.onSurfaceVariant
+                }
+            )
+        }
+
+        // Dropdown Vertical Slider Popup
+        if (showPopup) {
+            val offsetYPx = with(density) { (if (compact) 34.dp else 42.dp).roundToPx() }
+            Popup(
+                alignment = Alignment.TopEnd,
+                offset = IntOffset(0, offsetYPx),
+                onDismissRequest = {
+                    lastDismissTime = System.currentTimeMillis()
+                    showPopup = false
+                },
+                properties = PopupProperties(
+                    focusable = false,
+                    dismissOnClickOutside = true,
+                    dismissOnBackPress = true
+                )
+            ) {
+                Card(
+                    modifier = Modifier
+                        .width(78.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .border(1.5.dp, activeAccentColor, RoundedCornerShape(16.dp)),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (isDark) Color(0xFF0F172A) else MaterialTheme.colorScheme.surface
+                    ),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .padding(vertical = 12.dp, horizontal = 10.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        // Header: Volume % and Close button
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "$volPct%",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontWeight = FontWeight.Black,
+                                    fontSize = 11.sp
+                                ),
+                                color = activeAccentColor
+                            )
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Close volume slider",
+                                tint = if (isDark) Color(0xFF94A3B8) else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier
+                                    .size(14.dp)
+                                    .clickable {
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        showPopup = false
+                                        lastDismissTime = System.currentTimeMillis()
+                                    }
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        // Vertical Volume Track (drag & tap)
+                        val sliderHeight = 120.dp
+                        Box(
+                            modifier = Modifier
+                                .width(36.dp)
+                                .height(sliderHeight)
+                                .testTag(testTagSlider)
+                                .pointerInput(Unit) {
+                                    detectTapGestures { offset ->
+                                        val fraction = (1f - (offset.y / size.height)).coerceIn(0f, 1f)
+                                        val oldVal = (volume * 20).roundToInt()
+                                        val newVal = (fraction * 20).roundToInt()
+                                        if (oldVal != newVal) {
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        }
+                                        if (isMuted && fraction > 0f) {
+                                            onToggleMute?.invoke()
+                                        }
+                                        onVolumeChange(fraction)
+                                    }
+                                }
+                                .pointerInput(Unit) {
+                                    detectDragGestures { change, _ ->
+                                        change.consume()
+                                        val fraction = (1f - (change.position.y / size.height)).coerceIn(0f, 1f)
+                                        val oldVal = (volume * 20).roundToInt()
+                                        val newVal = (fraction * 20).roundToInt()
+                                        if (oldVal != newVal) {
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        }
+                                        if (isMuted && fraction > 0f) {
+                                            onToggleMute?.invoke()
+                                        }
+                                        onVolumeChange(fraction)
+                                    }
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Canvas(modifier = Modifier.fillMaxSize()) {
+                                val trackWidth = 6.dp.toPx()
+                                val cornerRadius = 3.dp.toPx()
+                                val centerX = size.width / 2f
+                                val h = size.height
+
+                                // Background rail
+                                drawRoundRect(
+                                    color = if (isDark) Color(0xFF334155) else Color(0xFFE2E8F0),
+                                    topLeft = Offset(centerX - trackWidth / 2f, 0f),
+                                    size = Size(trackWidth, h),
+                                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(cornerRadius, cornerRadius)
+                                )
+
+                                // Active fill from bottom
+                                val activeHeight = h * volume
+                                val activeTop = h - activeHeight
+                                drawRoundRect(
+                                    color = activeAccentColor,
+                                    topLeft = Offset(centerX - trackWidth / 2f, activeTop),
+                                    size = Size(trackWidth, activeHeight),
+                                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(cornerRadius, cornerRadius)
+                                )
+
+                                // Thumb circle ring
+                                val thumbY = activeTop.coerceIn(8.dp.toPx(), h - 8.dp.toPx())
+                                drawCircle(
+                                    color = if (isDark) Color(0xFF0F172A) else Color.White,
+                                    radius = 8.5.dp.toPx(),
+                                    center = Offset(centerX, thumbY)
+                                )
+                                drawCircle(
+                                    color = activeAccentColor,
+                                    radius = 8.5.dp.toPx(),
+                                    center = Offset(centerX, thumbY),
+                                    style = Stroke(width = 2.5.dp.toPx())
+                                )
+                            }
+                        }
+
+                        // Optional Mute / Unmute Button in Popup
+                        if (onToggleMute != null) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(
+                                        if (isMuted) Color(0xFFEF4444).copy(alpha = 0.15f)
+                                        else if (isDark) Color(0xFF1E293B) else Color(0xFFF1F5F9)
+                                    )
+                                    .clickable {
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        onToggleMute()
+                                    }
+                                    .padding(vertical = 4.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center
+                                ) {
+                                    Icon(
+                                        imageVector = if (isMuted) Icons.Default.VolumeOff else Icons.Default.VolumeUp,
+                                        contentDescription = if (isMuted) "Unmute" else "Mute",
+                                        tint = if (isMuted) Color(0xFFEF4444) else if (isDark) Color(0xFF94A3B8) else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(12.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(3.dp))
+                                    Text(
+                                        text = if (isMuted) "Unmute" else "Mute",
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 9.5.sp
+                                        ),
+                                        color = if (isMuted) Color(0xFFEF4444) else if (isDark) Color(0xFF94A3B8) else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 /**
@@ -1659,11 +1989,11 @@ private fun TrackPadColumn(
                 .padding(vertical = 14.dp, horizontal = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Track Title & Playback Toggle (Speaker symbol)
+            // Track Title & Reusable Volume Control Component
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 4.dp),
+                    .padding(horizontal = 2.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -1671,31 +2001,24 @@ private fun TrackPadColumn(
                     text = "Track ${trackIndex + 1}",
                     style = MaterialTheme.typography.titleMedium.copy(
                         fontWeight = FontWeight.Bold,
-                        fontSize = 17.sp,
+                        fontSize = 16.sp,
                         letterSpacing = 0.sp
                     ),
                     color = if (isRecording || isArmed) coralRecordingColor else activeAccentColor
                 )
 
-                // Speaker / Sound icon: tap to bring loop into the mix or mute
-                IconButton(
-                    onClick = onTogglePlayback,
-                    enabled = track.takes.isNotEmpty(),
-                    modifier = Modifier
-                        .size(32.dp)
-                        .testTag("track_${trackIndex + 1}_speaker_button")
-                ) {
-                    Icon(
-                        imageVector = if (track.isPlaybackEnabled) Icons.Default.VolumeUp else Icons.Default.VolumeOff,
-                        contentDescription = if (track.isPlaybackEnabled) "Mute Track ${trackIndex + 1}" else "Unmute Track ${trackIndex + 1}",
-                        tint = when {
-                            track.takes.isEmpty() -> if (isDark) Color(0xFF64748B) else Color(0xFFCBD5E1)
-                            track.isPlaybackEnabled -> emeraldPlayingColor
-                            else -> if (isDark) Color(0xFF64748B) else MaterialTheme.colorScheme.onSurfaceVariant
-                        },
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
+                LoopVolumeControl(
+                    volume = track.volume,
+                    onVolumeChange = onVolumeChange,
+                    activeAccentColor = activeAccentColor,
+                    isDark = isDark,
+                    isMuted = track.takes.isNotEmpty() && !track.isPlaybackEnabled,
+                    onToggleMute = if (track.takes.isNotEmpty()) onTogglePlayback else null,
+                    testTagButton = "track_${trackIndex + 1}_speaker_button",
+                    testTagSlider = "track_${trackIndex + 1}_volume_slider",
+                    contentDescription = "Track ${trackIndex + 1} volume",
+                    compact = true
+                )
             }
 
             Spacer(modifier = Modifier.height(6.dp))
@@ -2031,47 +2354,6 @@ private fun TrackPadColumn(
                         color = if (isDark) Color(0xFF64748B) else MaterialTheme.colorScheme.outline
                     ),
                     modifier = Modifier.padding(vertical = 4.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            // Track Volume Row: Icon + Slider + %
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 2.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = Icons.Default.VolumeMute,
-                    contentDescription = "Track volume",
-                    tint = if (isDark) Color(0xFF8B9CB2) else MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(18.dp)
-                )
-
-                Slider(
-                    value = track.volume,
-                    onValueChange = onVolumeChange,
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(24.dp)
-                        .padding(horizontal = 4.dp)
-                        .testTag("track_${trackIndex + 1}_volume_slider"),
-                    colors = SliderDefaults.colors(
-                        thumbColor = if (isDark) Color(0xFF475569) else activeAccentColor,
-                        activeTrackColor = if (isDark) Color(0xFF475569) else activeAccentColor,
-                        inactiveTrackColor = if (isDark) Color(0xFF1E293B) else Color(0xFFE2E8F0)
-                    )
-                )
-
-                Text(
-                    text = "${(track.volume * 100).roundToInt()}%",
-                    style = MaterialTheme.typography.bodySmall.copy(
-                        fontWeight = FontWeight.Medium,
-                        fontSize = 12.5.sp
-                    ),
-                    color = if (isDark) Color(0xFF8B9CB2) else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }

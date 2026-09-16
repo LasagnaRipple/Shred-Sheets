@@ -193,12 +193,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             pitchDetector.pitchState.collect { rawResult ->
                 val allStrings = getCurrentTuning().strings
 
-                if (rawResult.frequency > 20.0 && rawResult.confidence >= 0.40) {
-                    // String strike haptic feedback (disabled when drum loop / click track is playing back)
-                    if (_settings.value.hapticsEnabled && !_metronomePlaying.value) {
-                        hapticManager.performStringPluckFeedback()
-                    }
-
+                if (rawResult.frequency > 20.0 && rawResult.confidence >= 0.25) {
                     val closestString = MusicalPitchHelper.findClosestString(rawResult.frequency, allStrings)
                     val centsFromClosest = MusicalPitchHelper.calculateCentsDiff(rawResult.frequency, closestString.targetFrequency)
 
@@ -295,10 +290,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
 
-        // Observe pluck attacks from pitch detector to trigger tick shake animation
+        // Observe pluck attacks from pitch detector to trigger tick shake animation & haptics
         viewModelScope.launch {
             lastPluckEvent.collect { timestamp ->
                 if (timestamp > 0L) {
+                    if (_settings.value.hapticsEnabled && !_metronomePlaying.value) {
+                        hapticManager.performStringPluckFeedback()
+                    }
                     val targetNum = _selectedString.value?.stringNumber
                     if (targetNum != null) {
                         _pluckAnimationEvent.value = Pair(targetNum, timestamp)
@@ -925,6 +923,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun clearAllTakes() {
         loopStationEngine.clearAllTakes()
+    }
+
+    fun resetLoopStation() {
+        stopMetronome()
+        setMetronomeBpm(100)
+        setMetronomeTimeSignature(4)
+        setMetronomeSoundMode(com.example.model.MetronomeSoundMode.CLICK)
+        setExportTrackName("My track #1")
+        loopStationEngine.resetAll()
     }
 
     suspend fun bounceMix(trackName: String = _exportTrackName.value): java.io.File {

@@ -159,7 +159,6 @@ fun CartoonTunerFace(
     Canvas(
         modifier = modifier
             .testTag("modern_eyes_icon")
-            .testTag("cartoon_tuner_face_${faceType.name.lowercase()}")
     ) {
         val w = size.width
         val h = size.height

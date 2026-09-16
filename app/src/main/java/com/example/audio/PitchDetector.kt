@@ -10,6 +10,7 @@ import com.example.model.PitchResult
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -70,13 +71,18 @@ class PitchDetector {
         // 4096 samples (~93ms window) captures down to 28 Hz (Bass Low B) with rapid 43 fps refresh
         const val BUFFER_SIZE = 4096
         const val HOP_SIZE = 1024
-        private const val NOISE_FLOOR_RMS = 0.003 // Sensitive to soft acoustic plucks yet rejects ambient noise
+        private const val NOISE_FLOOR_RMS = 0.0006 // Highly sensitive to soft acoustic plucks, quiet electrics, and mobile mics
         private const val ATTACK_SPIKE_RMS_RATIO = 2.2 // Detect pluck strike
+        private const val SIGNAL_HOLD_MS = 280L // Smooth hold during acoustic pluck decay to avoid flickering
     }
+
+    private var lastValidPitchTimestamp = 0L
 
     @SuppressLint("MissingPermission")
     fun startListening(scope: CoroutineScope, onPitchDetected: ((PitchResult) -> Unit)? = null) {
-        if (isRecording) return
+        if (isRecording) {
+            stopListening()
+        }
 
         val minBufSize = AudioRecord.getMinBufferSize(
             SAMPLE_RATE,
@@ -84,95 +90,133 @@ class PitchDetector {
             AudioFormat.ENCODING_PCM_16BIT
         )
 
-        val actualBufferSize = max(BUFFER_SIZE * 2, minBufSize)
+        val actualBufferSize = if (minBufSize > 0) max(BUFFER_SIZE * 2, minBufSize) else BUFFER_SIZE * 2
+
+        // Try initializing AudioRecord with fallback sources if primary MIC is unavailable
+        val sources = intArrayOf(
+            MediaRecorder.AudioSource.MIC,
+            MediaRecorder.AudioSource.DEFAULT,
+            MediaRecorder.AudioSource.VOICE_RECOGNITION
+        )
+
+        var record: AudioRecord? = null
+        for (source in sources) {
+            try {
+                val candidate = AudioRecord(
+                    source,
+                    SAMPLE_RATE,
+                    AudioFormat.CHANNEL_IN_MONO,
+                    AudioFormat.ENCODING_PCM_16BIT,
+                    actualBufferSize
+                )
+                if (candidate.state == AudioRecord.STATE_INITIALIZED) {
+                    record = candidate
+                    break
+                } else {
+                    candidate.release()
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed AudioRecord source $source: ${e.message}")
+            }
+        }
+
+        if (record == null || record.state != AudioRecord.STATE_INITIALIZED) {
+            Log.e(TAG, "AudioRecord failed to initialize with all attempted sources")
+            return
+        }
+
+        audioRecord = record
 
         try {
-            audioRecord = AudioRecord(
-                MediaRecorder.AudioSource.MIC,
-                SAMPLE_RATE,
-                AudioFormat.CHANNEL_IN_MONO,
-                AudioFormat.ENCODING_PCM_16BIT,
-                actualBufferSize
-            )
-
-            if (audioRecord?.state != AudioRecord.STATE_INITIALIZED) {
-                Log.e(TAG, "AudioRecord failed to initialize")
-                return
-            }
-
             audioRecord?.startRecording()
             isRecording = true
 
-            // Reset stabilizer
+            // Reset stabilizer and state
             stabilizer.reset()
             previousRms = 0.0
             lastPluckTimestamp = 0L
+            lastValidPitchTimestamp = 0L
 
-            recordingJob = scope.launch(Dispatchers.Default) {
+            recordingJob = scope.launch(Dispatchers.IO) {
                 val readChunk = ShortArray(HOP_SIZE)
                 val circularBuffer = FloatArray(BUFFER_SIZE)
                 var circularHead = 0
                 var totalSamplesAccumulated = 0
 
                 while (isActive && isRecording) {
-                    val readCount = audioRecord?.read(readChunk, 0, HOP_SIZE) ?: 0
-                    if (readCount > 0) {
-                        // Calculate RMS of the newly arrived audio chunk
-                        var chunkSumSquare = 0.0
-                        for (i in 0 until readCount) {
-                            val sample = readChunk[i] / 32768.0f
-                            // Insert into circular buffer
-                            circularBuffer[(circularHead + i) % BUFFER_SIZE] = sample
-                            chunkSumSquare += (sample * sample)
+                    val currentRecord = audioRecord ?: break
+                    val readCount = currentRecord.read(readChunk, 0, HOP_SIZE)
+                    if (readCount <= 0) {
+                        delay(15L)
+                        continue
+                    }
+
+                    // Calculate RMS of the newly arrived audio chunk
+                    var chunkSumSquare = 0.0
+                    for (i in 0 until readCount) {
+                        val sample = readChunk[i] / 32768.0f
+                        // Insert into circular buffer
+                        circularBuffer[(circularHead + i) % BUFFER_SIZE] = sample
+                        chunkSumSquare += (sample * sample)
+                    }
+                    circularHead = (circularHead + readCount) % BUFFER_SIZE
+                    totalSamplesAccumulated += readCount
+
+                    // Wait until we have at least one full buffer of data
+                    if (totalSamplesAccumulated < BUFFER_SIZE) {
+                        continue
+                    }
+
+                    val rms = sqrt(chunkSumSquare / readCount)
+                    val now = System.currentTimeMillis()
+
+                    // Detect pluck attack: string was just struck
+                    if (previousRms > 0.0008 && (rms / previousRms) > ATTACK_SPIKE_RMS_RATIO) {
+                        lastPluckTimestamp = now
+                        _lastPluckEvent.value = now
+                    }
+                    previousRms = rms
+
+                    if (rms > NOISE_FLOOR_RMS) {
+                        // Flatten circular buffer into a linear window for pitch analysis
+                        val linearWindow = FloatArray(BUFFER_SIZE)
+                        for (i in 0 until BUFFER_SIZE) {
+                            linearWindow[i] = circularBuffer[(circularHead + i) % BUFFER_SIZE]
                         }
-                        circularHead = (circularHead + readCount) % BUFFER_SIZE
-                        totalSamplesAccumulated += readCount
 
-                        // Wait until we have at least one full buffer of data
-                        if (totalSamplesAccumulated < BUFFER_SIZE) {
-                            continue
-                        }
+                        val (rawFreq, confidence) = detectPitchMPM(linearWindow, BUFFER_SIZE, SAMPLE_RATE)
 
-                        val rms = sqrt(chunkSumSquare / readCount)
-                        val now = System.currentTimeMillis()
+                        // Validate detected frequency range: 28Hz (sub-bass) to 1450Hz (high guitar frets)
+                        if (rawFreq in 28.0..1450.0 && confidence >= 0.25) {
+                            lastValidPitchTimestamp = now
+                            val isAttackPhase = (now - lastPluckTimestamp) < 55L
+                            val smoothedFreq = stabilizer.update(rawFreq, confidence, isAttackPhase)
 
-                        // Detect pluck attack: string was just struck
-                        if (previousRms > 0.001 && (rms / previousRms) > ATTACK_SPIKE_RMS_RATIO) {
-                            lastPluckTimestamp = now
-                            _lastPluckEvent.value = now
-                        }
-                        previousRms = rms
-
-                        if (rms > NOISE_FLOOR_RMS) {
-                            // Flatten circular buffer into a linear window for pitch analysis
-                            val linearWindow = FloatArray(BUFFER_SIZE)
-                            for (i in 0 until BUFFER_SIZE) {
-                                linearWindow[i] = circularBuffer[(circularHead + i) % BUFFER_SIZE]
-                            }
-
-                            val (rawFreq, confidence) = detectPitchMPM(linearWindow, BUFFER_SIZE, SAMPLE_RATE)
-
-                            // Validate detected frequency range: 28Hz (sub-bass) to 1450Hz (high guitar frets)
-                            if (rawFreq in 28.0..1450.0 && confidence > 0.45) {
-                                val isAttackPhase = (now - lastPluckTimestamp) < 55L
-                                val smoothedFreq = stabilizer.update(rawFreq, confidence, isAttackPhase)
-
-                                val result = MusicalPitchHelper.frequencyToPitch(
-                                    freq = smoothedFreq,
-                                    amplitude = min(1.0, rms * 10.0),
-                                    confidence = confidence
-                                )
-                                _pitchState.value = result
-                                onPitchDetected?.invoke(result)
+                            val result = MusicalPitchHelper.frequencyToPitch(
+                                freq = smoothedFreq,
+                                amplitude = min(1.0, rms * 15.0),
+                                confidence = confidence
+                            )
+                            _pitchState.value = result
+                            onPitchDetected?.invoke(result)
+                        } else {
+                            // If note is decaying naturally, hold the pitch steadily for a short duration
+                            if (now - lastValidPitchTimestamp < SIGNAL_HOLD_MS && _pitchState.value.frequency > 20.0) {
+                                val decayedAmp = (_pitchState.value.amplitude * 0.90).coerceAtLeast(0.08)
+                                _pitchState.value = _pitchState.value.copy(amplitude = decayedAmp)
                             } else {
-                                // Signal present but pitch not clear (decay / thumping)
                                 _pitchState.value = _pitchState.value.copy(
                                     amplitude = min(1.0, rms * 5.0),
                                     confidence = 0.0
                                 )
                             }
+                        }
+                    } else {
+                        // Check if within hold time during quiet sustain
+                        if (now - lastValidPitchTimestamp < SIGNAL_HOLD_MS && _pitchState.value.frequency > 20.0) {
+                            val decayedAmp = (_pitchState.value.amplitude * 0.85).coerceAtLeast(0.05)
+                            _pitchState.value = _pitchState.value.copy(amplitude = decayedAmp)
                         } else {
-                            // Silent / below noise floor -> reset stabilizer
                             stabilizer.reset()
                             _pitchState.value = PitchResult.EMPTY
                         }
@@ -213,7 +257,7 @@ class PitchDetector {
         private var smoothedFreq = 0.0
 
         fun update(newFreq: Double, confidence: Double, isAttack: Boolean): Double {
-            if (newFreq <= 20.0 || confidence < 0.45) {
+            if (newFreq <= 20.0 || confidence < 0.25) {
                 reset()
                 return 0.0
             }
@@ -321,7 +365,7 @@ class PitchDetector {
             val curr = nsdf[tau]
             val next = nsdf[tau + 1]
 
-            if (curr > 0.30f && curr > prev && curr >= next) {
+            if (curr > 0.25f && curr > prev && curr >= next) {
                 peaks.add(Peak(tau, curr))
                 if (curr > highestPeakVal) {
                     highestPeakVal = curr
@@ -329,7 +373,7 @@ class PitchDetector {
             }
         }
 
-        if (peaks.isEmpty() || highestPeakVal < 0.40f) {
+        if (peaks.isEmpty() || highestPeakVal < 0.25f) {
             return Pair(0.0, 0.0)
         }
 
@@ -342,11 +386,11 @@ class PitchDetector {
 
         // 3. Harmonic Disambiguation:
         // If cand is an overtone (e.g. 2nd harmonic of Low E or A), check whether a fundamental
-        // at ~2*cand.lag exists with noticeably higher correlation (+0.06).
+        // at ~2*cand.lag exists with noticeably higher correlation (+0.04).
         // This prevents octave-doubling on wound strings without falsely doubling pure sines or treble notes.
         val doubleLagPeak = peaks.firstOrNull { peak ->
             val ratio = peak.lag.toFloat() / cand.lag
-            (ratio in 1.90f..2.10f) && peak.value > cand.value + 0.06f
+            (ratio in 1.90f..2.10f) && peak.value > cand.value + 0.04f
         }
 
         val chosenPeak = doubleLagPeak ?: cand

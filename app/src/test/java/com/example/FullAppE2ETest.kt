@@ -6,6 +6,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.test.core.app.ApplicationProvider
 import com.example.data.SettingsPreferences
 import com.example.model.AccentColor
@@ -166,6 +167,37 @@ class FullAppE2ETest {
         viewModel.resetTunedStringsProgress()
         assertFalse(viewModel.isAllStringsTuned.value)
         assertTrue(viewModel.tunedStringNumbers.value.isEmpty())
+    }
+
+    @Test
+    fun e2e_tuner_loadsOffAndTapToStartEngagesListener() {
+        // By default, tuner screen loads with tuner off
+        assertFalse(viewModel.isTunerActive.value)
+        assertFalse(viewModel.isListening.value)
+
+        composeTestRule.setContent {
+            val settings = viewModel.settings.value
+            ShredSheetsTheme(
+                accentColor = settings.accentColor,
+                colorMode = settings.colorMode
+            ) {
+                MainAppContent(
+                    viewModel = viewModel,
+                    onRequestPermission = {}
+                )
+            }
+        }
+
+        composeTestRule.waitForIdle()
+
+        // Verify "Tap to start" badge exists on initial load
+        composeTestRule.onNodeWithText("Tap to start").assertExists()
+
+        // Tap to start engages tuner
+        composeTestRule.onNodeWithTag("tuner_status_badge").performClick()
+        composeTestRule.waitForIdle()
+
+        assertTrue(viewModel.isTunerActive.value)
     }
 
     @Test
@@ -355,13 +387,7 @@ class FullAppE2ETest {
         composeTestRule.onNodeWithTag("loop_backing_play_button").assertExists()
         composeTestRule.onNodeWithTag("loop_sound_mode_click").assertExists()
         composeTestRule.onNodeWithTag("loop_sound_mode_drums").assertExists()
-        composeTestRule.onNodeWithTag("loop_backing_volume_button").assertExists().performClick()
-        composeTestRule.waitForIdle()
         composeTestRule.onNodeWithTag("loop_backing_volume_slider").assertExists()
-        // Tapping the volume button again hides the slider
-        composeTestRule.onNodeWithTag("loop_backing_volume_button").performClick()
-        composeTestRule.waitForIdle()
-        composeTestRule.onNodeWithTag("loop_backing_volume_slider").assertDoesNotExist()
         composeTestRule.onNodeWithTag("loop_length_slider").assertDoesNotExist()
         composeTestRule.onNodeWithTag("loop_bpm_decrement_button").assertExists()
         composeTestRule.onNodeWithTag("loop_bpm_increment_button").assertExists()
@@ -403,5 +429,37 @@ class FullAppE2ETest {
         composeTestRule.onNodeWithTag("loop_backing_play_button").performClick()
         composeTestRule.waitForIdle()
         assertFalse(viewModel.metronomePlaying.value)
+
+        // Delete and Reset Button and Confirmation Dialog
+        composeTestRule.onNodeWithTag("loop_delete_and_reset_button").performScrollTo().performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("delete_and_reset_dialog").assertExists()
+        composeTestRule.onNodeWithTag("confirm_delete_and_reset_no").assertExists()
+        composeTestRule.onNodeWithTag("confirm_delete_and_reset_yes").assertExists()
+
+        // Clicking 'No' cancels without resetting
+        composeTestRule.onNodeWithTag("confirm_delete_and_reset_no").performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("delete_and_reset_dialog").assertDoesNotExist()
+
+        // Modify settings to non-default
+        viewModel.setMetronomeBpm(135)
+        viewModel.setMetronomeSoundMode(com.example.model.MetronomeSoundMode.DRUMS)
+        assertEquals(135, viewModel.metronomeBpm.value)
+        assertEquals(com.example.model.MetronomeSoundMode.DRUMS, viewModel.metronomeSoundMode.value)
+
+        // Re-open dialog and click 'Yes' to reset
+        composeTestRule.onNodeWithTag("loop_delete_and_reset_button").performScrollTo().performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("confirm_delete_and_reset_yes").performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("delete_and_reset_dialog").assertDoesNotExist()
+
+        // Verify settings are reset to defaults
+        assertEquals(100, viewModel.metronomeBpm.value)
+        assertEquals(com.example.model.MetronomeSoundMode.CLICK, viewModel.metronomeSoundMode.value)
+        assertEquals(4, viewModel.metronomeTimeSignature.value)
+        assertFalse(viewModel.metronomePlaying.value)
+        assertEquals("My track #1", viewModel.exportTrackName.value)
     }
 }

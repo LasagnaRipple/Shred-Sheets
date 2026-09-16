@@ -240,7 +240,7 @@ fun MainAppContent(
                         AppTab.TUNER -> {
                             TunerScreen(
                                 pitchResult = pitchResult,
-                                hasSignal = pitchResult.frequency > 20.0 && pitchResult.confidence > 0.45,
+                                hasSignal = pitchResult.frequency > 20.0 && pitchResult.confidence >= 0.25,
                                 isListening = isListening,
                                 isTunerActive = isTunerActive,
                                 instrumentType = settings.selectedInstrument,

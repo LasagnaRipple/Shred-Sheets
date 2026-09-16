@@ -134,6 +134,39 @@ class LoopStationEngine(private val context: Context) {
         _tracks.value = _tracks.value.map { it.copy(takes = emptyList(), activeTakeId = null) }
     }
 
+    fun resetAll() {
+        stopRecording()
+        stopPreview()
+        stopRealtimeLoopMixer()
+        _recordingState.value = RecordingState.IDLE
+        _armedTrackIndex.value = null
+        _recordingTrackIndex.value = null
+        _recordingElapsedMs.value = 0L
+        _loopProgress.value = 0f
+        _currentBarIndex.value = 0
+        _backingVolume.value = 1.0f
+        _previewingTakeId.value = null
+        _currentRecordingTakeNumber.value = 1
+
+        // Delete audio files from disk for all takes
+        _tracks.value.forEach { track ->
+            track.takes.forEach { take ->
+                try {
+                    val file = File(take.audioFilePath)
+                    if (file.exists()) {
+                        file.delete()
+                    }
+                } catch (_: Exception) {}
+            }
+        }
+
+        _tracks.value = listOf(
+            LoopTrack(trackIndex = 0),
+            LoopTrack(trackIndex = 1)
+        )
+        syncLoopDuration(100, 4)
+    }
+
     fun syncLoopDuration(bpm: Int, timeSignature: Int) {
         _loopLengthSeconds.value = getLoopDurationSeconds(bpm, timeSignature)
     }
