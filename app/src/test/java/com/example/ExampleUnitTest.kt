@@ -25,7 +25,6 @@ class ExampleUnitTest {
         assertTrue("Green must be available in dark mode", darkAccents.contains(AccentColor.GREEN))
         assertTrue("Blue must be available in dark mode", darkAccents.contains(AccentColor.BLUE))
         assertTrue("Red must be available in dark mode", darkAccents.contains(AccentColor.RED))
-        assertTrue("White must be available in dark mode", darkAccents.contains(AccentColor.WHITE))
         assertFalse("Black must NOT be available in dark mode", darkAccents.contains(AccentColor.BLACK))
     }
 
@@ -33,7 +32,6 @@ class ExampleUnitTest {
     fun lightMode_accentAvailabilityRules() {
         val lightAccents = AccentColor.entries.filter { it.lightAllowed }
         assertFalse("Yellow must NOT be available in light mode (readability)", lightAccents.contains(AccentColor.YELLOW))
-        assertFalse("White must NOT be available in light mode (readability)", lightAccents.contains(AccentColor.WHITE))
         assertTrue("Orange must be available in light mode", lightAccents.contains(AccentColor.ORANGE))
         assertTrue("Purple must be available in light mode", lightAccents.contains(AccentColor.PURPLE))
         assertTrue("Green must be available in light mode", lightAccents.contains(AccentColor.GREEN))

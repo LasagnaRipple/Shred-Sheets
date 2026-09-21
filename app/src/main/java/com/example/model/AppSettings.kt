@@ -16,7 +16,6 @@ enum class AccentColor(
     GREEN("green", "Green", "🟢", Color(0xFF00E676), darkAllowed = true, lightAllowed = true),
     BLUE("blue", "Blue", "🔵", Color(0xFF00F0FF), darkAllowed = true, lightAllowed = true),
     RED("red", "Red", "🔴", Color(0xFFFF2A4B), darkAllowed = true, lightAllowed = true),
-    WHITE("white", "White", "⚪️", Color(0xFFFFFFFF), darkAllowed = true, lightAllowed = false),
     BLACK("black", "Black", "⚫️", Color(0xFF121212), darkAllowed = false, lightAllowed = true)
 }
 

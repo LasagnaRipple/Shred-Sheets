@@ -189,27 +189,6 @@ private val RedDarkColorScheme = darkColorScheme(
     outlineVariant = Color(0xFF3E2428)
 )
 
-private val WhiteDarkColorScheme = darkColorScheme(
-    primary = Color(0xFFFFFFFF),
-    onPrimary = Color(0xFF121212),
-    primaryContainer = Color(0xFF2A2A2A),
-    onPrimaryContainer = Color(0xFFFFFFFF),
-    secondary = Color(0xFFB0B0B0),
-    onSecondary = Color(0xFF121212),
-    secondaryContainer = Color(0xFF383838),
-    onSecondaryContainer = Color.White,
-    tertiary = Color(0xFFE0E0E0),
-    onTertiary = Color(0xFF121212),
-    background = Color(0xFF121212),
-    onBackground = VibrantTextWhite,
-    surface = Color(0xFF1C1C1C),
-    onSurface = VibrantTextWhite,
-    surfaceVariant = Color(0xFF2C2C2C),
-    onSurfaceVariant = Color(0xFFAAAAAA),
-    outline = Color(0xFF484848),
-    outlineVariant = Color(0xFF333333)
-)
-
 // --- ADDITIONAL ACCENT SCHEMES (LIGHT - OPTIMIZED FOR CRISP LEGIBILITY ACROSS ALL ACCENTS) ---
 private val BlueLightColorScheme = lightColorScheme(
     primary = Color(0xFF0284C7),          // Sky-600: vibrant oceanic azure, clear on light
@@ -358,7 +337,7 @@ fun ShredSheetsTheme(
     }
 
     // Safety checks:
-    // Light mode: Yellow & White unavailable -> fallback to Blue
+    // Light mode: Yellow unavailable -> fallback to Blue
     // Dark mode: Black unavailable -> fallback to Yellow
     val effectiveAccent = when {
         isDark && !baseAccent.darkAllowed -> AccentColor.YELLOW
@@ -374,7 +353,6 @@ fun ShredSheetsTheme(
             AccentColor.PURPLE -> PurpleDarkColorScheme
             AccentColor.GREEN -> GreenDarkColorScheme
             AccentColor.RED -> RedDarkColorScheme
-            AccentColor.WHITE -> WhiteDarkColorScheme
             AccentColor.BLACK -> RockDarkColorScheme
         }
     } else {
@@ -386,7 +364,6 @@ fun ShredSheetsTheme(
             AccentColor.RED -> RedLightColorScheme
             AccentColor.BLACK -> BlackLightColorScheme
             AccentColor.YELLOW -> BlueLightColorScheme
-            AccentColor.WHITE -> BlueLightColorScheme
         }
     }
 
