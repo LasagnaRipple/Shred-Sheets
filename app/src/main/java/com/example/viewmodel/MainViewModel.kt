@@ -32,8 +32,8 @@ enum class AppTab(val title: String, val icon: String = "") {
     TUNER("Tuner", "tuner"),
     CHORDS("Chords", "chords"),
     // METRONOME("Metronome", "metronome"), // Hidden per request - loop station has all metronome functions
-    LOOP("Loops", "loop"),
-    SHOP("Shop", "shop")
+    LOOP("Loops", "loop")
+    // SHOP("Shop", "shop") // Hidden per request
 }
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {

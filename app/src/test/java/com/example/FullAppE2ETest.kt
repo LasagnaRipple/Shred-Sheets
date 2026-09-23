@@ -103,14 +103,7 @@ class FullAppE2ETest {
         assertEquals(AppTab.LOOP, viewModel.currentTab.value)
         composeTestRule.onNodeWithTag("loop_backing_play_button").assertExists()
 
-        // 4. Switch to Shop tab
-        composeTestRule.onNodeWithTag("nav_tab_shop").performClick()
-        composeTestRule.waitForIdle()
-        assertEquals(AppTab.SHOP, viewModel.currentTab.value)
-        composeTestRule.onNodeWithTag("shop_screen_title").assertExists()
-        composeTestRule.onNodeWithTag("shop_buy_amazon_button").assertExists()
-
-        // 5. Switch back to Tuner tab
+        // 4. Switch back to Tuner tab
         composeTestRule.onNodeWithTag("nav_tab_tuner").performClick()
         composeTestRule.waitForIdle()
         assertEquals(AppTab.TUNER, viewModel.currentTab.value)
@@ -329,37 +322,12 @@ class FullAppE2ETest {
         assertEquals(MetronomeSoundMode.CLICK, viewModel.metronomeSoundMode.value)
     }
 
+    /*
     @Test
     fun e2e_shop_showroomPortfolioAndAmazonCTA() {
-        viewModel.selectTab(AppTab.SHOP)
-
-        composeTestRule.setContent {
-            val settings = viewModel.settings.value
-            ShredSheetsTheme(
-                accentColor = settings.accentColor,
-                colorMode = settings.colorMode
-            ) {
-                MainAppContent(
-                    viewModel = viewModel,
-                    onRequestPermission = {}
-                )
-            }
-        }
-
-        composeTestRule.waitForIdle()
-
-        // Assert Shop title & Amazon CTA button exist
-        composeTestRule.onNodeWithTag("shop_screen_title").assertExists()
-        val initialAccent = viewModel.settings.value.accentColor
-        composeTestRule.onNodeWithTag("shop_screen_title").performClick()
-        composeTestRule.waitForIdle()
-        val nextAccent = viewModel.settings.value.accentColor
-        org.junit.Assert.assertNotEquals(initialAccent, nextAccent)
-
-        composeTestRule.onNodeWithTag("shop_product_pager").assertExists()
-        composeTestRule.onNodeWithTag("shop_pager_dots").assertExists()
-        composeTestRule.onNodeWithTag("shop_buy_amazon_button").assertExists()
+        // Shop tab is commented out per user request
     }
+    */
 
     @Test
     fun e2e_loopStation_navigationAndControls() {

@@ -225,7 +225,7 @@ fun ShredNavTabIcon(
         AppTab.TUNER -> NavTunerIcon(tint = tint, modifier = modifier)
         AppTab.CHORDS -> NavChordsIcon(tint = tint, modifier = modifier)
         AppTab.LOOP -> NavInfinityIcon(tint = tint, modifier = modifier)
-        AppTab.SHOP -> NavShopIcon(tint = tint, modifier = modifier)
+        // AppTab.SHOP -> NavShopIcon(tint = tint, modifier = modifier)
     }
 }
 

@@ -325,12 +325,14 @@ fun MainAppContent(
                             )
                         }
 
+                        /*
                         AppTab.SHOP -> {
                             ShopScreen(
                                 onThemeToggle = { viewModel.toggleTheme(isDark) },
                                 modifier = Modifier.fillMaxSize()
                             )
                         }
+                        */
                     }
                 }
             }
