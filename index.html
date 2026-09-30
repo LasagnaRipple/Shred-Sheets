@@ -71,7 +71,25 @@
   @media (min-width:900px){ .groups{grid-template-columns:1fr 1fr;gap:44px;} }
   .cards{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
   @media (max-width:520px){ .cards{grid-template-columns:1fr;} }
-  .product{background:var(--card);border-radius:18px;padding:16px;display:flex;flex-direction:column;}
+
+.product{
+  border-radius:18px;
+  padding:16px;
+  display:flex;
+  flex-direction:column;
+}
+
+/* Original products – slightly darker */
+.group:first-of-type .product{
+  background:#1a1a1a;
+}
+
+/* Songwriter products – slightly lighter */
+.group:last-of-type .product{
+  background:#222222;
+}
+
+  
   .cover{width:100%;aspect-ratio:1252/1622;border-radius:10px;background-size:cover;background-position:center;box-shadow:0 8px 22px rgba(0,0,0,.45);}
   .product h3{font-family:"Bricolage Grotesque",system-ui,sans-serif;font-weight:800;text-transform:uppercase;font-size:15px;margin:16px 0 6px;}
   .product p{font-family:"Bricolage Grotesque",system-ui,sans-serif;font-weight:300;font-size:13.5px;color:var(--sub);line-height:1.5;margin:0 0 16px;flex:1;}
