@@ -52,6 +52,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.example.BuildConfig
 import com.example.model.AccentColor
 import com.example.model.AppSettings
 import com.example.model.AppStyleTheme
@@ -387,6 +388,15 @@ fun SettingsDialog(
                         color = MaterialTheme.colorScheme.onPrimary
                     )
                 }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Text(
+                    text = "v${BuildConfig.VERSION_NAME} (Build ${BuildConfig.VERSION_CODE})",
+                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                    color = mutedText.copy(alpha = 0.7f),
+                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                )
             }
         }
     }

@@ -49,7 +49,7 @@ The App Bundle will be generated at `app/build/outputs/bundle/release/app-releas
 ## 🚀 Google Play Console Release Checklist
 
 1. **Application ID**: `com.aistudio.shredsheets.tuner`
-2. **Version Code**: Set in `app/build.gradle.kts` (currently `versionCode = 2`, `versionName = "2.0"`).
+2. **Version Code**: Set in `app/build.gradle.kts` (currently `versionCode = 10`, `versionName = "10.0"`).
 3. **App Signing**:
    - For Google Play App Signing, generate an upload keystore:
      ```bash
