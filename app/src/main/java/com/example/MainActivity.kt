@@ -296,6 +296,18 @@ fun MainAppContent(
                             )
                         }
 
+                        /* Tab Studio editor hidden per request for production release
+                        AppTab.TABS -> {
+                            com.example.ui.tabs.TabStudioScreen(
+                                tabEngine = viewModel.tabAudioEngine,
+                                hasMicPermission = hasMicPermission,
+                                onRequestMicPermission = onRequestPermission,
+                                onThemeToggle = { viewModel.toggleTheme(isDark) },
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                        */
+
                         /* Metronome tab hidden per request - Loop Station includes all metronome functions
                         AppTab.METRONOME -> {
                             MetronomeScreen(

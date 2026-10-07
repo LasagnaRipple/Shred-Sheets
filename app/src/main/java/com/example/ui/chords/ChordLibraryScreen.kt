@@ -84,6 +84,7 @@ import com.example.ui.theme.ShredFretGrid
 import com.example.ui.theme.ShredMuteCoral
 import com.example.ui.theme.ShredMutedText
 import com.example.ui.theme.ShredNutColor
+import com.example.ui.theme.ShredOpenLightModeGreen
 import com.example.ui.theme.ShredOpenNeonGreen
 import com.example.ui.theme.ShredPrimaryText
 import kotlinx.coroutines.Job
@@ -592,9 +593,10 @@ fun FretboardDiagram(
                     drawLine(ShredMuteCoral, Offset(stringX + d, cy - d), Offset(stringX - d, cy + d), strokeWidth = 2.5.dp.toPx())
                 }
                 pos.fret == 0 -> {
-                    // Open string 'O' above nut in app's neon green (#C8FF3D)
+                    // Open string 'O' above nut: neon green in dark mode, crisp high-contrast green in light mode
+                    val openColor = if (isDark) ShredOpenNeonGreen else ShredOpenLightModeGreen
                     val cy = topMargin - 14.dp.toPx()
-                    drawCircle(ShredOpenNeonGreen, radius = 5.5.dp.toPx(), center = Offset(stringX, cy), style = Stroke(2.2.dp.toPx()))
+                    drawCircle(openColor, radius = 5.5.dp.toPx(), center = Offset(stringX, cy), style = Stroke(2.2.dp.toPx()))
                 }
                 pos.fret in 1..numFrets -> {
                     // Finger dot inside fret
@@ -723,20 +725,22 @@ fun ChordDiagramKeyDialog(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    // Item 1: O = Open string in ShredOpenNeonGreen
+                    val openStringColor = if (isDark) ShredOpenNeonGreen else ShredOpenLightModeGreen
+
+                    // Item 1: O = Open string in ShredOpenNeonGreen (dark) or ShredOpenLightModeGreen (light)
                     DiagramKeyRow(
                         symbolSlot = {
                             Box(
                                 modifier = Modifier
                                     .size(40.dp)
                                     .clip(RoundedCornerShape(10.dp))
-                                    .background(ShredOpenNeonGreen.copy(alpha = 0.14f))
-                                    .border(1.dp, ShredOpenNeonGreen.copy(alpha = 0.4f), RoundedCornerShape(10.dp)),
+                                    .background(openStringColor.copy(alpha = if (isDark) 0.14f else 0.12f))
+                                    .border(1.dp, openStringColor.copy(alpha = if (isDark) 0.4f else 0.35f), RoundedCornerShape(10.dp)),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Canvas(modifier = Modifier.size(20.dp)) {
                                     drawCircle(
-                                        color = ShredOpenNeonGreen,
+                                        color = openStringColor,
                                         radius = 6.dp.toPx(),
                                         style = Stroke(2.2.dp.toPx())
                                     )

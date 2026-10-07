@@ -1,6 +1,6 @@
 {
   "name": "Shred Sheets",
-  "description": "Interactive guitar and string instrument tuner with pitch detection, chord library, anagram generator, and 2-track loop station with backing drums.",
+  "description": "Interactive guitar and string instrument tuner with pitch detection, chord library, guitar tab studio with real-time transcription and note quantisation, and loop station.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

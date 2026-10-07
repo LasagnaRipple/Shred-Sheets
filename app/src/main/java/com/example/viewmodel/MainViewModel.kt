@@ -31,6 +31,7 @@ import kotlin.random.Random
 enum class AppTab(val title: String, val icon: String = "") {
     TUNER("Tuner", "tuner"),
     CHORDS("Chords", "chords"),
+    // TABS("Tabs", "tab"), // Hidden for production release per request
     // METRONOME("Metronome", "metronome"), // Hidden per request - loop station has all metronome functions
     LOOP("Loops", "loop")
     // SHOP("Shop", "shop") // Hidden per request
@@ -44,6 +45,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val toneSynthesizer = ToneSynthesizer()
     val hapticManager = HapticFeedbackManager(application)
     val loopStationEngine = com.example.audio.LoopStationEngine(application)
+    val tabAudioEngine = com.example.audio.TabAudioEngine(application, toneSynthesizer)
 
     // App Settings loaded from persistent storage (Auto detect default ON on load/return)
     private val _settings = MutableStateFlow(
@@ -448,12 +450,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         stopStringHoldLoop()
         val previousTab = _currentTab.value
         _currentTab.value = tab
+        /*
+        if (previousTab == AppTab.TABS && tab != AppTab.TABS) {
+            tabAudioEngine.onNavigateAway()
+        }
+        */
         if (tab == AppTab.TUNER && previousTab != AppTab.TUNER) {
             // When returning to the tuner tab, toggle Auto detect to ON
             _settings.value = _settings.value.copy(tunerMode = com.example.model.TunerMode.AUTO)
         } else if (tab == AppTab.CHORDS) {
             toneSynthesizer.warmUp()
-        }
+        } /* else if (tab == AppTab.TABS) {
+            toneSynthesizer.warmUp()
+        } */
         updateListeningState()
         if (_settings.value.hapticsEnabled) {
             hapticManager.performLightTick()
@@ -994,6 +1003,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         stopStringHoldLoop()
         toneSynthesizer.release()
         loopStationEngine.release()
+        tabAudioEngine.release()
         stopListening()
         stopMetronome()
     }

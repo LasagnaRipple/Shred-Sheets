@@ -224,8 +224,55 @@ fun ShredNavTabIcon(
     when (tab) {
         AppTab.TUNER -> NavTunerIcon(tint = tint, modifier = modifier)
         AppTab.CHORDS -> NavChordsIcon(tint = tint, modifier = modifier)
+        // AppTab.TABS -> NavTabSheetIcon(tint = tint, modifier = modifier) // Hidden for production release
         AppTab.LOOP -> NavInfinityIcon(tint = tint, modifier = modifier)
         // AppTab.SHOP -> NavShopIcon(tint = tint, modifier = modifier)
+    }
+}
+
+/**
+ * Tab Sheet icon: 4 guitar tab staff lines with 3 fret note indicators
+ */
+@Composable
+fun NavTabSheetIcon(
+    tint: Color,
+    modifier: Modifier = Modifier
+) {
+    Canvas(modifier = modifier.size(21.dp)) {
+        val w = size.width
+        val h = size.height
+
+        // 4 staff lines tapering down from bottom thick line to top fine line
+        val lineSpacing = h * 0.22f
+        val startY = h * 0.17f
+        for (i in 0..3) {
+            val y = startY + i * lineSpacing
+            val strokeWidth = (1.0f + (i * 0.45f)).dp.toPx()
+            drawLine(
+                color = tint.copy(alpha = 0.45f + i * 0.16f),
+                start = Offset(w * 0.10f, y),
+                end = Offset(w * 0.90f, y),
+                strokeWidth = strokeWidth,
+                cap = StrokeCap.Round
+            )
+        }
+
+        // 3 fret note beads across strings (giving authentic "0-3-5" tab look)
+        drawCircle(
+            color = tint,
+            radius = 2.6.dp.toPx(),
+            center = Offset(w * 0.28f, startY + 2 * lineSpacing)
+        )
+        drawCircle(
+            color = tint,
+            radius = 2.6.dp.toPx(),
+            center = Offset(w * 0.52f, startY + 0 * lineSpacing)
+        )
+        drawCircle(
+            color = tint,
+            radius = 2.6.dp.toPx(),
+            center = Offset(w * 0.76f, startY + 1 * lineSpacing)
+        )
     }
 }
 
