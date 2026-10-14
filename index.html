@@ -370,10 +370,15 @@
 
 .logo {
   text-align: center;
-  padding: 0px 0 0px;
+  padding: 16px 0 8px;
 }
 
-
+.logo img {
+  width: min(320px, 75vw);   /* 320px on desktop, but never more than 75% of screen width */
+  height: auto;
+  display: block;
+  margin: 0 auto;
+}
 
   
 </style>
