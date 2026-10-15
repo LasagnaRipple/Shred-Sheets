@@ -607,8 +607,12 @@ body, .product, .btn, .card, .app-teaser {
 </div>
 
 <footer>
-  © 2026 Shred Sheets · <a href="privacy-policy.html">Privacy Policy</a>
+  © <span id="year"></span> Shred Sheets · <a href="privacy-policy.html">Privacy Policy</a>
 </footer>
+
+<script>
+  document.getElementById('year').textContent = new Date().getFullYear();
+</script>
 
 <script>
   const toggle = document.getElementById('theme-toggle');
