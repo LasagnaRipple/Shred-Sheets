@@ -495,18 +495,22 @@ body, .product, .btn, .card, .app-teaser {
 }
 
 
-#books {
-  background: #161616;                  /* slightly lighter than pure black */
-  padding: 60px 20px 80px;
-  margin: 60px -20px 0;                 /* full-width band */
-  border-radius: 0;
+ .section-header {
+  background: #1c1c1c;               /* dark mode contrast */
+  padding: 50px 20px 40px;
+  margin: 60px -20px 40px;           /* full width */
+  text-align: center;
+  border-top: 1px solid #2a2a2a;
+  border-bottom: 1px solid #2a2a2a;
 }
 
 /* Light mode version */
-[data-theme="light"] #books {
-  background: #efe0d1;                  /* slightly deeper version of the off-white */
+[data-theme="light"] .section-header {
+  background: #ead5c4;               /* slightly deeper off-white */
+  border-top: 1px solid #e0cbb8;
+  border-bottom: 1px solid #e0cbb8;
 }
- 
+
  
 </style>
 </head>
@@ -544,9 +548,10 @@ body, .product, .btn, .card, .app-teaser {
     </div>
   </section>
 
-  <div id="books">
-    <h2 class="section-title">PICK YOUR SHRED SHEETS</h2>
-    <p class="section-sub">Massive riffs or songwriting bliss?</p>
+<div class="section-header">
+  <h2 class="section-title">PICK YOUR SHRED SHEETS</h2>
+  <p class="section-sub">Massive riffs or songwriting bliss?</p>
+</div>
 
     <div class="groups">
 
