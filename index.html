@@ -495,18 +495,26 @@ body, .product, .btn, .card, .app-teaser {
 }
 
 
- .section-header {
-  background: #1c1c1c;               /* dark mode contrast */
+.section-header {
+  background: #1c1c1c;
   padding: 50px 20px 40px;
-  margin: 60px -20px 40px;           /* full width */
+  margin: 60px 0 40px;
   text-align: center;
   border-top: 1px solid #2a2a2a;
   border-bottom: 1px solid #2a2a2a;
+
+  /* These two lines make it full viewport width */
+  width: 100vw;
+  position: relative;
+  left: 50%;
+  right: 50%;
+  margin-left: -50vw;
+  margin-right: -50vw;
 }
 
-/* Light mode version */
+/* Light mode */
 [data-theme="light"] .section-header {
-  background: #ead5c4;               /* slightly deeper off-white */
+  background: #ead5c4;
   border-top: 1px solid #e0cbb8;
   border-bottom: 1px solid #e0cbb8;
 }
