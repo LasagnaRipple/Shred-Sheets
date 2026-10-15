@@ -484,6 +484,20 @@ body, a, button, .btn, .product, .cover {
 body, .product, .btn, .card, .app-teaser {
   transition: background-color 0.35s ease, color 0.35s ease, border-color 0.35s ease;
 }
+
+
+/* Fix light mode text colors */
+[data-theme="light"] .section-title {
+  color: var(--text);           /* Makes "PICK YOUR SHRED SHEETS" dark */
+}
+
+[data-theme="light"] .group:first-of-type h2 .tag {
+  color: var(--text);           /* Makes "ORIGINAL" dark */
+}
+
+[data-theme="light"] .group:last-of-type h2 .tag {
+  color: var(--accent);         /* Keep "SONGWRITER" red */
+}
  
  
 </style>
